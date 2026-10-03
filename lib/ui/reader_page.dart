@@ -659,8 +659,9 @@ class _ReaderPageState extends State<ReaderPage> {
                           children: [
                             IconButton(
                               onPressed: () => _setChapter(_chapter - 1),
+                              tooltip: 'فصل قبل',
                               icon: Icon(
-                                Icons.chevron_right_rounded,
+                                Icons.chevron_left_rounded,
                                 color: _foreground,
                               ),
                             ),
@@ -689,8 +690,9 @@ class _ReaderPageState extends State<ReaderPage> {
                             ),
                             IconButton(
                               onPressed: () => _setChapter(_chapter + 1),
+                              tooltip: 'فصل بعد',
                               icon: Icon(
-                                Icons.chevron_left_rounded,
+                                Icons.chevron_right_rounded,
                                 color: _foreground,
                               ),
                             ),

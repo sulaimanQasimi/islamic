@@ -96,5 +96,23 @@
       "icon": "contacts",
       "featured": false
     }
+    ,
+    {
+      "id": "masnavi-daftar-1",
+      "title": "مثنوی معنوی دفتر اول",
+      "originalTitle": "مثنوی معنوی دفتر اول",
+      "author": "مولانا جلال‌الدین محمد بلخی",
+      "translator": "",
+      "category": "ادبیات کلاسیک",
+      "language": "فارسی",
+      "direction": "rtl",
+      "description": "Publication date 2023-08-29 Topics مثنوی معنوی دفتر اول Collection booksbylanguage_persian; booksbylanguage Language Persian Item Size 72.2M\n\nAddeddate 2023-08-28 19:43:50 Collection_added booksbylanguage Identifier 20230828_20230828_1941 Identifier-ark ark:/13960/s2x3f0qcqc3 Ocr tesseract 5.3.0-3-g9920 Ocr_detected_lang fa Ocr_detected_lang_conf 1.0000 Ocr_detected_script Arabic Ocr_detected_script_conf 1.0000 Ocr_module_version 0.0.21 Ocr_parameters -l fas Page_number_confidence 0",
+      "file": "masnavi_daftar1.epub",
+      "gutenbergId": 0,
+      "color": "#A38F6E",
+      "icon": "book",
+      "featured": false
+    }
+ 
   ]
 }

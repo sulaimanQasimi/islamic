@@ -442,7 +442,15 @@ class _LibraryPageState extends State<LibraryPage> {
               ),
             ),
             const SizedBox(width: 10),
-            const Icon(Icons.play_circle_fill_rounded, color: green, size: 30),
+            const Icon(
+              IconData(
+                0xf00a1,
+                fontFamily: 'MaterialIcons',
+                matchTextDirection: true,
+              ),
+              color: green,
+              size: 30,
+            ),
           ],
         ),
       ),
@@ -681,43 +689,47 @@ class BookCover extends StatelessWidget {
   final double height;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: width,
-    height: height,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(11),
-      gradient: LinearGradient(
-        begin: Alignment.topRight,
-        end: Alignment.bottomLeft,
-        colors: [book.color, book.color.withValues(alpha: .76)],
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(11),
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [book.color, book.color.withValues(alpha: .76)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: book.color.withValues(alpha: .22),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      boxShadow: [
-        BoxShadow(
-          color: book.color.withValues(alpha: .22),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Stack(
-      children: [
-        Positioned(
-          left: 7,
-          top: 7,
-          bottom: 7,
-          child: Container(
-            width: 1,
-            color: Colors.white.withValues(alpha: .35),
+      child: Stack(
+        children: [
+          Positioned.directional(
+            textDirection: TextDirection.rtl,
+            start: 7,
+            top: 7,
+            bottom: 7,
+            child: Container(
+              width: 1,
+              color: Colors.white.withValues(alpha: .35),
+            ),
           ),
-        ),
-        Center(
-          child: Icon(
-            book.icon,
-            color: Colors.white.withValues(alpha: .9),
-            size: width * .42,
+          Center(
+            child: Icon(
+              book.icon,
+              color: Colors.white.withValues(alpha: .9),
+              size: width * .42,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
