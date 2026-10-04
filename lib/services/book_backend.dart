@@ -84,13 +84,10 @@ class BookBackend {
   Book _bookFromFileName(String fileName) {
     final base =
         fileName.replaceAll(RegExp(r'\.epub$', caseSensitive: false), '');
-    final id = base
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
+    final id = Book.normalizeId(base);
     final title = base.replaceAll(RegExp(r'[_\-]+'), ' ').trim();
     return Book(
-      id: id.isEmpty ? base : id,
+      id: id,
       title: title.isEmpty ? base : title,
       author: 'نویسنده نامشخص',
       category: 'عمومی',

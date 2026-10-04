@@ -50,6 +50,19 @@ class Book {
     return 'rtl';
   }
 
+  /// Cache/file-safe id: lowercase letters, digits, and hyphens only.
+  static String normalizeId(String raw) {
+    final id = raw
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    if (id.isEmpty) {
+      throw ArgumentError.value(raw, 'id', 'Invalid book id');
+    }
+    return id;
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
@@ -92,7 +105,7 @@ class Book {
       _ => Icons.auto_stories_rounded,
     };
     return Book(
-      id: json['id'] as String,
+      id: normalizeId(json['id'] as String? ?? ''),
       title: json['title'] as String? ?? 'کتاب بی‌نام',
       author: json['author'] as String? ?? 'نویسنده نامشخص',
       category: json['category'] as String? ?? 'عمومی',
