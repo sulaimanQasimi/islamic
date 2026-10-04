@@ -27,7 +27,7 @@ class _ReaderPageState extends State<ReaderPage> {
   int _theme = 0;
   int _chapter = 0;
   String _font = 'سریف';
-  bool _justify = true;
+  String _align = 'justify';
   String _selectedText = '';
   final Set<int> _bookmarks = {};
   final Set<String> _highlights = {};
@@ -39,9 +39,21 @@ class _ReaderPageState extends State<ReaderPage> {
     (Color(0xFF252A28), Color(0xFFE7E3D7)),
     (Color(0xFFF3E6CC), Color(0xFF4B3D2B)),
   ];
+  static const _alignOptions = <(String, IconData, String)>[
+    ('right', Icons.format_align_right_rounded, 'راست'),
+    ('center', Icons.format_align_center_rounded, 'وسط'),
+    ('left', Icons.format_align_left_rounded, 'چپ'),
+    ('justify', Icons.format_align_justify_rounded, 'دوطرفه'),
+  ];
   Color get _background => _palettes[_theme].$1;
   Color get _foreground => _palettes[_theme].$2;
   TextDirection get _contentDirection => widget.book.textDirection;
+  TextAlign get _bodyAlign => switch (_align) {
+    'left' => TextAlign.left,
+    'right' => TextAlign.right,
+    'center' => TextAlign.center,
+    _ => TextAlign.justify,
+  };
 
   @override
   void initState() {
@@ -84,7 +96,7 @@ class _ReaderPageState extends State<ReaderPage> {
           _palettes.length - 1,
         );
         _font = prefs.getString('readerFont') ?? 'سریف';
-        _justify = prefs.getBool('readerJustify') ?? true;
+        _align = _normalizeAlign(prefs.getString('readerAlign'));
         _bookmarks.addAll(
           prefs.getStringList('bookmarks_${widget.book.id}')?.map(int.parse) ??
               [],
@@ -269,26 +281,31 @@ class _ReaderPageState extends State<ReaderPage> {
                       )
                       .toList(),
                 ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'تراز دوطرفهٔ متن',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: const Text(
-                    'فاصلهٔ واژه‌ها برای پر کردن عرض صفحه تنظیم می‌شود.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  value: _justify,
-                  activeThumbColor: green,
-                  onChanged: (value) {
-                    setState(() => _justify = value);
-                    refresh(() {});
-                    _saveReaderSettings();
-                  },
+                const SizedBox(height: 16),
+                const Text(
+                  'تراز متن',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _alignOptions
+                      .map(
+                        (option) => ChoiceChip(
+                          avatar: Icon(option.$2, size: 18),
+                          label: Text(option.$3),
+                          selected: _align == option.$1,
+                          onSelected: (_) {
+                            setState(() => _align = option.$1);
+                            refresh(() {});
+                            _saveReaderSettings();
+                          },
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
                 const Text(
                   'رنگ صفحه',
                   style: TextStyle(fontWeight: FontWeight.w700),
@@ -340,14 +357,13 @@ class _ReaderPageState extends State<ReaderPage> {
     await prefs.setDouble('readerLineHeight', _lineHeight);
     await prefs.setInt('readerTheme', _theme);
     await prefs.setString('readerFont', _font);
-    await prefs.setBool('readerJustify', _justify);
+    await prefs.setString('readerAlign', _align);
   }
 
-  TextAlign get _bodyAlign {
-    if (_justify) return TextAlign.justify;
-    return _contentDirection == TextDirection.rtl
-        ? TextAlign.right
-        : TextAlign.left;
+  String _normalizeAlign(String? value) {
+    const allowed = {'left', 'right', 'center', 'justify'};
+    if (value != null && allowed.contains(value)) return value;
+    return 'justify';
   }
 
   void _showContents() {
