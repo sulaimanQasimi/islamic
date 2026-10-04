@@ -743,44 +743,69 @@ class _ReaderPageState extends State<ReaderPage> {
                             ),
                           ],
                         ),
-                        Row(
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 4,
+                          runSpacing: 4,
                           children: [
-                            TextButton.icon(
-                              onPressed: _addHighlight,
-                              icon: const Icon(Icons.highlight_alt_rounded),
-                              label: const Text('برجسته‌سازی'),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed: _addHighlight,
+                                  tooltip: 'برجسته‌سازی',
+                                  visualDensity: VisualDensity.compact,
+                                  icon: Icon(
+                                    Icons.highlight_alt_rounded,
+                                    color: _foreground,
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: _showContents,
+                                  tooltip: 'فهرست',
+                                  visualDensity: VisualDensity.compact,
+                                  icon: Icon(
+                                    Icons.list_rounded,
+                                    color: _foreground,
+                                  ),
+                                ),
+                              ],
                             ),
-                            TextButton.icon(
-                              onPressed: _showContents,
-                              icon: const Icon(Icons.list_rounded),
-                              label: const Text('فهرست'),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: () {
-                                setState(
-                                  () => _fontSize = (_fontSize - 1)
-                                      .clamp(17, 34)
-                                      .toDouble(),
-                                );
-                                _saveReaderSettings();
-                              },
-                              icon: Icon(Icons.remove, color: _foreground),
-                            ),
-                            Text(
-                              '${_fontSize.round()}',
-                              style: TextStyle(color: _foreground),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                setState(
-                                  () => _fontSize = (_fontSize + 1)
-                                      .clamp(17, 34)
-                                      .toDouble(),
-                                );
-                                _saveReaderSettings();
-                              },
-                              icon: Icon(Icons.add, color: _foreground),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed: () {
+                                    setState(
+                                      () => _fontSize = (_fontSize - 1)
+                                          .clamp(17, 34)
+                                          .toDouble(),
+                                    );
+                                    _saveReaderSettings();
+                                  },
+                                  tooltip: 'کوچک‌تر',
+                                  visualDensity: VisualDensity.compact,
+                                  icon: Icon(Icons.remove, color: _foreground),
+                                ),
+                                Text(
+                                  '${_fontSize.round()}',
+                                  style: TextStyle(color: _foreground),
+                                ),
+                                IconButton(
+                                  onPressed: () {
+                                    setState(
+                                      () => _fontSize = (_fontSize + 1)
+                                          .clamp(17, 34)
+                                          .toDouble(),
+                                    );
+                                    _saveReaderSettings();
+                                  },
+                                  tooltip: 'بزرگ‌تر',
+                                  visualDensity: VisualDensity.compact,
+                                  icon: Icon(Icons.add, color: _foreground),
+                                ),
+                              ],
                             ),
                           ],
                         ),
