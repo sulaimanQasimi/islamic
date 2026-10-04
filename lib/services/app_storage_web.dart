@@ -16,6 +16,13 @@ List<String>? getStringList(String key) {
 
 int? getInt(String key) => int.tryParse(getString(key) ?? '');
 double? getDouble(String key) => double.tryParse(getString(key) ?? '');
+bool? getBool(String key) {
+  final value = getString(key);
+  if (value == 'true') return true;
+  if (value == 'false') return false;
+  return null;
+}
+
 bool containsKey(String key) => getString(key) != null;
 Future<void> setString(String key, String value) async =>
     web.window.localStorage.setItem(key, value);
@@ -24,4 +31,6 @@ Future<void> setStringList(String key, List<String> value) async =>
 Future<void> setInt(String key, int value) async =>
     web.window.localStorage.setItem(key, '$value');
 Future<void> setDouble(String key, double value) async =>
+    web.window.localStorage.setItem(key, '$value');
+Future<void> setBool(String key, bool value) async =>
     web.window.localStorage.setItem(key, '$value');

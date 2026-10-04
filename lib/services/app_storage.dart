@@ -13,6 +13,7 @@ class AppStorage {
   List<String>? getStringList(String key) => platform.getStringList(key);
   int? getInt(String key) => platform.getInt(key);
   double? getDouble(String key) => platform.getDouble(key);
+  bool? getBool(String key) => platform.getBool(key);
   bool containsKey(String key) => platform.containsKey(key);
   Future<void> setString(String key, String value) =>
       platform.setString(key, value);
@@ -21,4 +22,5 @@ class AppStorage {
   Future<void> setInt(String key, int value) => platform.setInt(key, value);
   Future<void> setDouble(String key, double value) =>
       platform.setDouble(key, value);
+  Future<void> setBool(String key, bool value) => platform.setBool(key, value);
 }

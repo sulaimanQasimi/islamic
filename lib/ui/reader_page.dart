@@ -27,6 +27,7 @@ class _ReaderPageState extends State<ReaderPage> {
   int _theme = 0;
   int _chapter = 0;
   String _font = 'سریف';
+  bool _justify = true;
   String _selectedText = '';
   final Set<int> _bookmarks = {};
   final Set<String> _highlights = {};
@@ -83,6 +84,7 @@ class _ReaderPageState extends State<ReaderPage> {
           _palettes.length - 1,
         );
         _font = prefs.getString('readerFont') ?? 'سریف';
+        _justify = prefs.getBool('readerJustify') ?? true;
         _bookmarks.addAll(
           prefs.getStringList('bookmarks_${widget.book.id}')?.map(int.parse) ??
               [],
@@ -267,7 +269,26 @@ class _ReaderPageState extends State<ReaderPage> {
                       )
                       .toList(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'تراز دوطرفهٔ متن',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text(
+                    'فاصلهٔ واژه‌ها برای پر کردن عرض صفحه تنظیم می‌شود.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  value: _justify,
+                  activeThumbColor: green,
+                  onChanged: (value) {
+                    setState(() => _justify = value);
+                    refresh(() {});
+                    _saveReaderSettings();
+                  },
+                ),
+                const SizedBox(height: 8),
                 const Text(
                   'رنگ صفحه',
                   style: TextStyle(fontWeight: FontWeight.w700),
@@ -319,6 +340,14 @@ class _ReaderPageState extends State<ReaderPage> {
     await prefs.setDouble('readerLineHeight', _lineHeight);
     await prefs.setInt('readerTheme', _theme);
     await prefs.setString('readerFont', _font);
+    await prefs.setBool('readerJustify', _justify);
+  }
+
+  TextAlign get _bodyAlign {
+    if (_justify) return TextAlign.justify;
+    return _contentDirection == TextDirection.rtl
+        ? TextAlign.right
+        : TextAlign.left;
   }
 
   void _showContents() {
@@ -591,7 +620,7 @@ class _ReaderPageState extends State<ReaderPage> {
                                         ? 'serif'
                                         : null,
                                   ),
-                                  textAlign: TextAlign.justify,
+                                  textAlign: _bodyAlign,
                                 ),
                                 if (_highlights.isNotEmpty) ...[
                                   const SizedBox(height: 30),

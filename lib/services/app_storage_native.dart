@@ -11,6 +11,7 @@ String? getString(String key) => _prefs.getString(key);
 List<String>? getStringList(String key) => _prefs.getStringList(key);
 int? getInt(String key) => _prefs.getInt(key);
 double? getDouble(String key) => _prefs.getDouble(key);
+bool? getBool(String key) => _prefs.getBool(key);
 bool containsKey(String key) => _prefs.containsKey(key);
 Future<void> setString(String key, String value) async {
   await _prefs.setString(key, value);
@@ -26,4 +27,8 @@ Future<void> setInt(String key, int value) async {
 
 Future<void> setDouble(String key, double value) async {
   await _prefs.setDouble(key, value);
+}
+
+Future<void> setBool(String key, bool value) async {
+  await _prefs.setBool(key, value);
 }
