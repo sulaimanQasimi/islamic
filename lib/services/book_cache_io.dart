@@ -19,7 +19,11 @@ Future<Uint8List?> read(String id) async {
   return file.readAsBytes();
 }
 
-Future<void> write(String id, Uint8List bytes) async =>
-    File(await _path(id)).writeAsBytes(bytes, flush: true);
+Future<void> write(String id, Uint8List bytes) async {
+  final target = File(await _path(id));
+  final tmp = File('${target.path}.tmp');
+  await tmp.writeAsBytes(bytes, flush: true);
+  await tmp.rename(target.path);
+}
 
 Future<bool> contains(String id) async => File(await _path(id)).exists();

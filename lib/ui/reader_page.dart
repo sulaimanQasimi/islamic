@@ -26,7 +26,6 @@ class _ReaderPageState extends State<ReaderPage> {
   double _lineHeight = 2;
   int _theme = 0;
   int _chapter = 0;
-  String _font = 'سریف';
   String _align = 'justify';
   String _selectedText = '';
   final Set<int> _bookmarks = {};
@@ -48,6 +47,18 @@ class _ReaderPageState extends State<ReaderPage> {
   Color get _background => _palettes[_theme].$1;
   Color get _foreground => _palettes[_theme].$2;
   TextDirection get _contentDirection => widget.book.textDirection;
+  /// Highlights are stored as `chapterIndex|text`; entries without a
+  /// separator predate that format and are shown on every chapter.
+  List<String> get _chapterHighlights => _highlights
+      .map((entry) {
+        final sep = entry.indexOf('|');
+        if (sep < 0) return entry;
+        final chapter = int.tryParse(entry.substring(0, sep));
+        return chapter == _chapter ? entry.substring(sep + 1) : null;
+      })
+      .whereType<String>()
+      .toList();
+
   TextAlign get _bodyAlign => switch (_align) {
     'left' => TextAlign.left,
     'right' => TextAlign.right,
@@ -84,7 +95,7 @@ class _ReaderPageState extends State<ReaderPage> {
       if (!mounted) return;
       setState(() {
         _document = doc;
-        _isOffline = true;
+        _isOffline = cached;
         _chapter = (prefs.getInt('progress_${widget.book.id}') ?? 0).clamp(
           0,
           doc.chapters.length - 1,
@@ -95,7 +106,6 @@ class _ReaderPageState extends State<ReaderPage> {
           0,
           _palettes.length - 1,
         );
-        _font = prefs.getString('readerFont') ?? 'سریف';
         _align = _normalizeAlign(prefs.getString('readerAlign'));
         _bookmarks.addAll(
           prefs.getStringList('bookmarks_${widget.book.id}')?.map(int.parse) ??
@@ -147,7 +157,11 @@ class _ReaderPageState extends State<ReaderPage> {
     if (_document == null) return;
     setState(() => _chapter = value.clamp(0, _document!.chapters.length - 1));
     _saveProgress();
-    if (_scroll.hasClients) _scroll.jumpTo(0);
+    if (_scroll.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+      });
+    }
   }
 
   void _toggleBookmark() {
@@ -178,7 +192,7 @@ class _ReaderPageState extends State<ReaderPage> {
       );
       return;
     }
-    setState(() => _highlights.add(_selectedText.trim()));
+    setState(() => _highlights.add('$_chapter|${_selectedText.trim()}'));
     _saveNotes();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('یادداشت به برجسته‌شده‌ها افزوده شد.')),
@@ -260,27 +274,6 @@ class _ReaderPageState extends State<ReaderPage> {
                     _saveReaderSettings();
                   },
                 ),
-                const Text(
-                  'نوع قلم',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: ['سریف', 'ساده']
-                      .map(
-                        (name) => ChoiceChip(
-                          label: Text(name),
-                          selected: _font == name,
-                          onSelected: (_) {
-                            setState(() => _font = name);
-                            refresh(() {});
-                            _saveReaderSettings();
-                          },
-                        ),
-                      )
-                      .toList(),
-                ),
                 const SizedBox(height: 16),
                 const Text(
                   'تراز متن',
@@ -356,8 +349,7 @@ class _ReaderPageState extends State<ReaderPage> {
     await prefs.setDouble('readerFontSize', _fontSize);
     await prefs.setDouble('readerLineHeight', _lineHeight);
     await prefs.setInt('readerTheme', _theme);
-    await prefs.setString('readerFont', _font);
-    await prefs.setString('readerAlign', _align);
+        await prefs.setString('readerAlign', _align);
   }
 
   String _normalizeAlign(String? value) {
@@ -632,13 +624,10 @@ class _ReaderPageState extends State<ReaderPage> {
                                     fontSize: _fontSize,
                                     height: _lineHeight,
                                     color: _foreground,
-                                    fontFamily: _font == 'سریف'
-                                        ? 'serif'
-                                        : null,
                                   ),
                                   textAlign: _bodyAlign,
                                 ),
-                                if (_highlights.isNotEmpty) ...[
+                                if (_chapterHighlights.isNotEmpty) ...[
                                   const SizedBox(height: 30),
                                   Divider(
                                     color: _foreground.withValues(alpha: .12),
@@ -653,7 +642,7 @@ class _ReaderPageState extends State<ReaderPage> {
                                       ),
                                     ),
                                   ),
-                                  ..._highlights.map(
+                                  ..._chapterHighlights.map(
                                     (text) => Padding(
                                       padding: const EdgeInsets.only(top: 10),
                                       child: Container(

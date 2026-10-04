@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 
 import '../main.dart';
@@ -22,7 +21,6 @@ class _LibraryPageState extends State<LibraryPage> {
   final _search = TextEditingController();
   List<Book> _books = [];
   Set<String> _favorites = {};
-  List<String> _recentIds = [];
   Map<String, int> _progress = {};
   Map<String, int> _chapterCounts = {};
   String _category = 'همه';
@@ -61,7 +59,6 @@ class _LibraryPageState extends State<LibraryPage> {
         _catalogOffline = false;
         _books = books;
         _favorites = (prefs.getStringList('favoriteBooks') ?? []).toSet();
-        _recentIds = prefs.getStringList('recentBooks') ?? [];
         _progress = {
           for (final book in books)
             book.id: prefs.getInt('progress_${book.id}') ?? 0,
@@ -85,7 +82,6 @@ class _LibraryPageState extends State<LibraryPage> {
           setState(() {
             _books = books;
             _favorites = (prefs.getStringList('favoriteBooks') ?? []).toSet();
-            _recentIds = prefs.getStringList('recentBooks') ?? [];
             _progress = {
               for (final book in books)
                 book.id: prefs.getInt('progress_${book.id}') ?? 0,
@@ -99,7 +95,9 @@ class _LibraryPageState extends State<LibraryPage> {
             _error = null;
           });
           return;
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Could not restore cached catalog: $e');
+        }
       }
       setState(() {
         _loading = false;
@@ -130,11 +128,6 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<void> _open(Book book) async {
-    final prefs = await AppStorage.getInstance();
-    final recent = prefs.getStringList('recentBooks') ?? [];
-    recent.remove(book.id);
-    recent.insert(0, book.id);
-    await prefs.setStringList('recentBooks', recent.take(8).toList());
     if (!mounted) return;
     final result = await Navigator.push<int>(
       context,
@@ -183,7 +176,7 @@ class _LibraryPageState extends State<LibraryPage> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: green.withOpacity(0.08),
+                              color: green.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Row(
@@ -223,7 +216,7 @@ class _LibraryPageState extends State<LibraryPage> {
                             child: Text(
                               'کتابی پیدا نشد.',
                               style: TextStyle(
-                                color: ink.withOpacity(0.55),
+                                color: ink.withValues(alpha: 0.55),
                                 fontSize: 14,
                               ),
                             ),
@@ -258,7 +251,7 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         bottomNavigationBar: NavigationBar(
           backgroundColor: Colors.white,
-          indicatorColor: green.withOpacity(0.12),
+          indicatorColor: green.withValues(alpha: 0.12),
           selectedIndex: _tab,
           onDestinationSelected: (value) => setState(() {
             _tab = value;
@@ -420,7 +413,7 @@ class _LibraryPageState extends State<LibraryPage> {
       padding: const EdgeInsets.symmetric(horizontal: 18),
       scrollDirection: Axis.horizontal,
       itemCount: categories.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      separatorBuilder: (_, _) => const SizedBox(width: 8),
       itemBuilder: (_, index) {
         final value = categories[index];
         final isSelected = value == _category;
@@ -432,7 +425,7 @@ class _LibraryPageState extends State<LibraryPage> {
           labelStyle: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: isSelected ? Colors.white : ink.withOpacity(0.7),
+            color: isSelected ? Colors.white : ink.withValues(alpha: 0.7),
           ),
           backgroundColor: Colors.white,
           side: BorderSide(color: isSelected ? green : const Color(0xFFE2DDD2)),
@@ -469,7 +462,7 @@ class BookCoverCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.18),
+              color: Colors.black.withValues(alpha: 0.18),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -485,7 +478,7 @@ class BookCoverCard extends StatelessWidget {
                   margin: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: goldColor.withOpacity(0.7),
+                      color: goldColor.withValues(alpha: 0.7),
                       width: 1.5,
                     ),
                   ),
@@ -497,7 +490,7 @@ class BookCoverCard extends StatelessWidget {
                   margin: const EdgeInsets.all(11),
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: darkGold.withOpacity(0.5),
+                      color: darkGold.withValues(alpha: 0.5),
                       width: 1,
                     ),
                   ),
@@ -515,8 +508,8 @@ class BookCoverCard extends StatelessWidget {
                       begin: Alignment.centerRight,
                       end: Alignment.centerLeft,
                       colors: [
-                        Colors.black.withOpacity(0.4),
-                        Colors.black.withOpacity(0.0),
+                        Colors.black.withValues(alpha: 0.4),
+                        Colors.black.withValues(alpha: 0.0),
                       ],
                     ),
                   ),
@@ -530,7 +523,7 @@ class BookCoverCard extends StatelessWidget {
                 height: 52,
                 child: CustomPaint(
                   painter: ArchOrnamentPainter(
-                    color: goldColor.withOpacity(0.65),
+                    color: goldColor.withValues(alpha: 0.65),
                   ),
                 ),
               ),
@@ -571,7 +564,7 @@ class BookCoverCard extends StatelessWidget {
                           Expanded(
                             child: Container(
                               height: 1,
-                              color: goldColor.withOpacity(0.4),
+                              color: goldColor.withValues(alpha: 0.4),
                             ),
                           ),
                           Padding(
@@ -579,13 +572,13 @@ class BookCoverCard extends StatelessWidget {
                             child: Icon(
                               Icons.spa_rounded,
                               size: 12,
-                              color: goldColor.withOpacity(0.7),
+                              color: goldColor.withValues(alpha: 0.7),
                             ),
                           ),
                           Expanded(
                             child: Container(
                               height: 1,
-                              color: goldColor.withOpacity(0.4),
+                              color: goldColor.withValues(alpha: 0.4),
                             ),
                           ),
                         ],
@@ -597,7 +590,7 @@ class BookCoverCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: goldColor.withOpacity(0.9),
+                          color: goldColor.withValues(alpha: 0.9),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           shadows: const [

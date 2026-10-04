@@ -67,9 +67,12 @@ class EpubParser {
         ?.innerText
         .trim();
     final chapters = <EpubChapter>[];
+    final titlesByPath = _tocTitles(read, base);
     for (final ref in package.findAllElements('itemref')) {
       final path = manifest[ref.getAttribute('idref')];
       if (path == null) continue;
+      // Note: inline markup (italics, images, tables) is flattened to plain
+      // text; only paragraph structure is preserved.
       final html = read(path)
           .replaceAll(
             RegExp(r'<(script|style)[^>]*>[\s\S]*?</\1>', caseSensitive: false),
@@ -90,7 +93,10 @@ class EpubParser {
           .trim();
       if (body.isEmpty) continue;
       chapters.add(
-        EpubChapter(title: 'فصل ${chapters.length + 1}', body: body),
+        EpubChapter(
+          title: titlesByPath[path] ?? 'فصل ${chapters.length + 1}',
+          body: body,
+        ),
       );
     }
     if (chapters.isEmpty) {
@@ -101,6 +107,53 @@ class EpubParser {
       author: author?.isNotEmpty == true ? author! : fallbackAuthor,
       chapters: chapters,
     );
+  }
+
+  /// Maps normalized content paths to chapter titles from the NCX table of
+  /// contents, when the EPUB provides one.
+  static Map<String, String> _tocTitles(
+    String Function(String path) read,
+    String base,
+  ) {
+    try {
+      // The NCX path is not tracked in the manifest above, so locate it via
+      // the item whose href ends with .ncx.
+      final container = XmlDocument.parse(read('META-INF/container.xml'));
+      final opfPath = container
+          .findAllElements('rootfile')
+          .first
+          .getAttribute('full-path');
+      if (opfPath == null) return const {};
+      final package = XmlDocument.parse(read(opfPath));
+      String? ncxPath;
+      for (final item in package.findAllElements('item')) {
+        final href = item.getAttribute('href');
+        if (href != null && href.toLowerCase().endsWith('.ncx')) {
+          ncxPath = _normalize(
+            '$base${Uri.decodeComponent(Uri.parse(href).path)}',
+          );
+          break;
+        }
+      }
+      if (ncxPath == null) return const {};
+      final ncx = XmlDocument.parse(read(ncxPath));
+      final titles = <String, String>{};
+      for (final point in ncx.findAllElements('navPoint')) {
+        final label = point
+            .findAllElements('text')
+            .firstOrNull
+            ?.innerText
+            .trim();
+        final src = point.findAllElements('content').firstOrNull?.getAttribute('src');
+        if (label == null || label.isEmpty || src == null) continue;
+        final path = src.split('#').first;
+        if (path.isEmpty) continue;
+        titles[_normalize('$base${Uri.decodeComponent(Uri.parse(path).path)}')] = label;
+      }
+      return titles;
+    } catch (_) {
+      return const {};
+    }
   }
 
   static String _normalize(String path) {
@@ -124,10 +177,12 @@ class EpubParser {
     (match) {
       final value = match[1]!;
       if (value.startsWith('#x')) {
-        return String.fromCharCode(int.parse(value.substring(2), radix: 16));
+        final sb = StringBuffer()..writeCharCode(int.parse(value.substring(2), radix: 16));
+        return sb.toString();
       }
       if (value.startsWith('#')) {
-        return String.fromCharCode(int.parse(value.substring(1)));
+        final sb = StringBuffer()..writeCharCode(int.parse(value.substring(1)));
+        return sb.toString();
       }
       return switch (value.toLowerCase()) {
         'amp' => '&',

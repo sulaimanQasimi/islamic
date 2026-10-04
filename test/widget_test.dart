@@ -35,7 +35,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('کتاب‌خانه'), findsWidgets);
     expect(find.text('گلستان سعدی'), findsWidgets);
-    expect(find.text('شروع مطالعه'), findsOneWidget);
+    expect(find.text('ادبیات'), findsWidgets);
     expect(find.text('افزودن کتاب'), findsNothing);
   });
 }

@@ -44,5 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Local build helpers (kept off C: due to disk space)
+.gradle-home/
+.tmp/
+
 # Widget Preview related
 .widget_preview/

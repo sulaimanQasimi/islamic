@@ -1,6 +1,6 @@
 # Ketab book catalogue backend
 
-This read-only Node.js service is the app's catalogue source. Readers can browse, search, download, and read books. They cannot upload or edit catalogue entries. You manage the catalogue by adding EPUB files under `backend/books/` and editing `backend/catalog.json` on your server.
+This read-only Node.js service hosts the catalogue over HTTP for remote/deployment use. The Flutter app currently bundles the same EPUBs and `catalog.json` from `assets/books/`, so the server is optional; if you later point the app at the API, its routes mirror the asset layout. Readers can browse, search, download, and read books. They cannot upload or edit catalogue entries. You manage the catalogue by adding EPUB files under `backend/books/` and editing `backend/catalog.json` on your server.
 
 ## Run locally
 
@@ -18,13 +18,7 @@ The server reads `catalog.json` on each request, so catalogue edits appear after
 
 ## Connect the Flutter app
 
-The default app API address is `http://localhost:8080/api`. For an Android emulator, use the host alias:
-
-```powershell
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
-```
-
-For a physical phone, use the computer's LAN address instead of `10.0.2.2`. Flutter web and desktop can use the default localhost address. Use HTTPS for a deployed backend; the Android manifest allows cleartext HTTP for this local test setup.
+The app does not talk to this server yet. When you add an HTTP mode to `BookBackend`, use `http://localhost:8080/api` by default; for an Android emulator use the host alias `http://10.0.2.2:8080/api`, and for a physical phone use your computer's LAN address. Use HTTPS for a deployed backend; the Android manifest allows cleartext HTTP for local testing. Note the server buffers whole EPUBs in memory and does not support range requests.
 
 ## Add a book
 

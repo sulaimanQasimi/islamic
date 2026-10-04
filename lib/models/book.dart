@@ -94,6 +94,9 @@ class Book {
       '',
     );
     final colorValue = int.tryParse(colorText, radix: 16) ?? 0xFF2E6757;
+    final color = colorText.length >= 8
+        ? Color(colorValue)
+        : Color(colorValue | 0xFF000000);
     final language = json['language'] as String? ?? 'دری';
     final icon = switch (json['icon']) {
       'local_florist' => Icons.local_florist_rounded,
@@ -117,7 +120,7 @@ class Book {
       description: json['description'] as String? ?? '',
       originalTitle: json['originalTitle'] as String? ?? '',
       translator: json['translator'] as String? ?? '',
-      color: Color(colorValue | 0xFF000000),
+      color: color,
       icon: icon,
       featured: json['featured'] as bool? ?? false,
       gutenbergId: (json['gutenbergId'] as num?)?.toInt() ?? 0,
