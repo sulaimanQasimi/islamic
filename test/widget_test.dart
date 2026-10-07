@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:islamic/models/book.dart';
 import 'package:islamic/services/book_backend.dart';
 import 'package:islamic/ui/library_page.dart';
@@ -27,13 +28,17 @@ class _CatalogBackend extends BookBackend {
 }
 
 void main() {
-  testWidgets('shows a read-only Dari book catalogue', (tester) async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
+
+  testWidgets('shows a read-only Marefat book catalogue', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
       MaterialApp(home: LibraryPage(backend: _CatalogBackend())),
     );
-    await tester.pumpAndSettle();
-    expect(find.text('کتاب‌خانه'), findsWidgets);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('معرفت'), findsWidgets);
     expect(find.text('گلستان سعدی'), findsWidgets);
     expect(find.text('ادبیات'), findsWidgets);
     expect(find.text('افزودن کتاب'), findsNothing);

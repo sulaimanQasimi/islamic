@@ -1,11 +1,11 @@
 {
-    "name": "islamic",
-    "short_name": "islamic",
+    "name": "معرفت",
+    "short_name": "معرفت",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#E6F0EC",
+    "theme_color": "#1A5C4E",
+    "description": "معرفت — کتاب‌خانه و خوانندهٔ پیشرفتهٔ EPUB",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

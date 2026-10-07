@@ -1,5 +1,5 @@
 name: islamic
-description: "Ketab — a read-only Dari EPUB library and reader app."
+description: "معرفت — کتاب‌خانه و خوانندهٔ پیشرفتهٔ EPUB."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -42,6 +42,9 @@ dependencies:
   web: ^1.1.1
   xml: ^6.5.0
   path_provider: ^2.1.6
+  google_fonts: ^6.3.2
+  flutter_animate: ^4.5.2
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

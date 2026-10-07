@@ -1,42 +1,82 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'ui/library_page.dart';
+import 'services/app_storage.dart';
+import 'theme/marefat_theme.dart';
+import 'ui/home_shell.dart';
+import 'ui/splash_page.dart';
 
-const ink = Color(0xFF183B35);
-const green = Color(0xFF2E6757);
-const paper = Color(0xFFF7F4EC);
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+  runApp(const MarefatApp());
+}
 
-void main() => runApp(const KetabApp());
-
-class KetabApp extends StatelessWidget {
-  const KetabApp({super.key});
+class MarefatApp extends StatefulWidget {
+  const MarefatApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    debugShowCheckedModeBanner: false,
-    title: 'کتاب‌خانه',
-    locale: const Locale('fa'),
-    supportedLocales: const [Locale('fa'), Locale('en')],
-    localizationsDelegates: const [
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    builder: (context, child) => Directionality(
-      textDirection: TextDirection.rtl,
-      child: child ?? const SizedBox.shrink(),
-    ),
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: paper,
-      colorScheme: ColorScheme.fromSeed(seedColor: green, surface: paper),
-      fontFamily: 'Roboto',
-      appBarTheme: const AppBarTheme(
-        backgroundColor: paper,
-        foregroundColor: ink,
+  State<MarefatApp> createState() => _MarefatAppState();
+}
+
+class _MarefatAppState extends State<MarefatApp> {
+  ThemeMode _themeMode = ThemeMode.system;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    final results = await Future.wait([
+      AppStorage.getInstance(),
+      Future<void>.delayed(const Duration(milliseconds: 1200)),
+    ]);
+    final prefs = results[0] as AppStorage;
+    final theme = prefs.getString('appThemeMode');
+    if (!mounted) return;
+    setState(() {
+      _themeMode = switch (theme) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+      _ready = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MarefatAppScope(
+      themeMode: _themeMode,
+      onThemeModeChanged: (mode) => setState(() => _themeMode = mode),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'معرفت',
+        locale: const Locale('fa'),
+        supportedLocales: const [Locale('fa'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        builder: (context, child) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
+        ),
+        theme: MarefatTheme.light(),
+        darkTheme: MarefatTheme.dark(),
+        themeMode: _themeMode,
+        home: _ready ? const HomeShell() : const SplashPage(),
       ),
-    ),
-    home: const LibraryPage(),
-  );
+    );
+  }
 }

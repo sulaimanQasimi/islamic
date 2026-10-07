@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
-import '../services/app_storage.dart';
-
-import '../main.dart';
 import '../models/book.dart';
+import '../services/app_storage.dart';
 import '../services/book_backend.dart';
 import '../services/book_cache.dart';
 import '../services/epub_parser.dart';
+import '../theme/marefat_theme.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({super.key, required this.book, required this.backend});
@@ -22,6 +23,7 @@ class _ReaderPageState extends State<ReaderPage> {
   String? _error;
   bool _loading = true;
   bool _isOffline = false;
+  bool _chromeVisible = true;
   double _fontSize = 22;
   double _lineHeight = 2;
   int _theme = 0;
@@ -32,11 +34,11 @@ class _ReaderPageState extends State<ReaderPage> {
   final Set<String> _highlights = {};
   final _scroll = ScrollController();
 
-  static const _palettes = <(Color, Color)>[
-    (Color(0xFFF7F4EC), Color(0xFF28352F)),
-    (Color(0xFFFFFEFA), Color(0xFF302F2B)),
-    (Color(0xFF252A28), Color(0xFFE7E3D7)),
-    (Color(0xFFF3E6CC), Color(0xFF4B3D2B)),
+  static const _palettes = <(Color, Color, String)>[
+    (Color(0xFFF7F4EC), Color(0xFF28352F), 'کاغذی'),
+    (Color(0xFFFFFEFA), Color(0xFF302F2B), 'روشن'),
+    (Color(0xFF1A2421), Color(0xFFE7E3D7), 'شب'),
+    (Color(0xFFF3E6CC), Color(0xFF4B3D2B), 'سپیده'),
   ];
   static const _alignOptions = <(String, IconData, String)>[
     ('right', Icons.format_align_right_rounded, 'راست'),
@@ -44,11 +46,11 @@ class _ReaderPageState extends State<ReaderPage> {
     ('left', Icons.format_align_left_rounded, 'چپ'),
     ('justify', Icons.format_align_justify_rounded, 'دوطرفه'),
   ];
+
   Color get _background => _palettes[_theme].$1;
   Color get _foreground => _palettes[_theme].$2;
   TextDirection get _contentDirection => widget.book.textDirection;
-  /// Highlights are stored as `chapterIndex|text`; entries without a
-  /// separator predate that format and are shown on every chapter.
+
   List<String> get _chapterHighlights => _highlights
       .map((entry) {
         final sep = entry.indexOf('|');
@@ -74,6 +76,7 @@ class _ReaderPageState extends State<ReaderPage> {
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _scroll.dispose();
     super.dispose();
   }
@@ -118,9 +121,7 @@ class _ReaderPageState extends State<ReaderPage> {
       });
       if (!cached && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('کتاب برای مطالعهٔ آفلاین آماده شد.'),
-          ),
+          const SnackBar(content: Text('کتاب برای مطالعهٔ آفلاین آماده شد.')),
         );
       }
     } catch (error) {
@@ -151,6 +152,20 @@ class _ReaderPageState extends State<ReaderPage> {
       'highlights_${widget.book.id}',
       _highlights.toList(),
     );
+  }
+
+  Future<void> _saveReaderSettings() async {
+    final prefs = await AppStorage.getInstance();
+    await prefs.setDouble('readerFontSize', _fontSize);
+    await prefs.setDouble('readerLineHeight', _lineHeight);
+    await prefs.setInt('readerTheme', _theme);
+    await prefs.setString('readerAlign', _align);
+  }
+
+  String _normalizeAlign(String? value) {
+    const allowed = {'left', 'right', 'center', 'justify'};
+    if (value != null && allowed.contains(value)) return value;
+    return 'justify';
   }
 
   void _setChapter(int value) {
@@ -202,10 +217,10 @@ class _ReaderPageState extends State<ReaderPage> {
   Future<void> _openSettings() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: paper,
+      backgroundColor: MarefatColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, refresh) => Directionality(
@@ -226,13 +241,13 @@ class _ReaderPageState extends State<ReaderPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 const Text(
                   'تنظیمات مطالعه',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: ink,
+                    fontWeight: FontWeight.w900,
+                    color: MarefatColors.ink,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -274,7 +289,7 @@ class _ReaderPageState extends State<ReaderPage> {
                     _saveReaderSettings();
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 const Text(
                   'تراز متن',
                   style: TextStyle(fontWeight: FontWeight.w700),
@@ -304,37 +319,53 @@ class _ReaderPageState extends State<ReaderPage> {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: List.generate(
-                    _palettes.length,
-                    (i) => GestureDetector(
+                Wrap(
+                  spacing: 10,
+                  children: List.generate(_palettes.length, (i) {
+                    final selected = _theme == i;
+                    return GestureDetector(
                       onTap: () {
                         setState(() => _theme = i);
                         refresh(() {});
                         _saveReaderSettings();
                       },
-                      child: Container(
-                        margin: const EdgeInsetsDirectional.only(end: 12),
-                        width: 38,
-                        height: 38,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 64,
+                        height: 64,
                         decoration: BoxDecoration(
                           color: _palettes[i].$1,
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: _theme == i ? green : Colors.black12,
-                            width: _theme == i ? 3 : 1,
+                            color: selected
+                                ? MarefatColors.forest
+                                : Colors.black12,
+                            width: selected ? 2.5 : 1,
+                          ),
+                          boxShadow: selected
+                              ? [
+                                  BoxShadow(
+                                    color: MarefatColors.forest.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                    blurRadius: 10,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _palettes[i].$3,
+                            style: TextStyle(
+                              color: _palettes[i].$2,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
-                        child: _theme == i
-                            ? Icon(
-                                Icons.check,
-                                color: _palettes[i].$2,
-                                size: 18,
-                              )
-                            : null,
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ),
               ],
             ),
@@ -344,63 +375,74 @@ class _ReaderPageState extends State<ReaderPage> {
     );
   }
 
-  Future<void> _saveReaderSettings() async {
-    final prefs = await AppStorage.getInstance();
-    await prefs.setDouble('readerFontSize', _fontSize);
-    await prefs.setDouble('readerLineHeight', _lineHeight);
-    await prefs.setInt('readerTheme', _theme);
-        await prefs.setString('readerAlign', _align);
-  }
-
-  String _normalizeAlign(String? value) {
-    const allowed = {'left', 'right', 'center', 'justify'};
-    if (value != null && allowed.contains(value)) return value;
-    return 'justify';
-  }
-
   void _showContents() {
     final chapters = _document?.chapters ?? [];
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: paper,
+      backgroundColor: MarefatColors.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Directionality(
         textDirection: TextDirection.rtl,
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Text(
-                'فهرست کتاب',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: ink,
-                ),
-              ),
-              const SizedBox(height: 10),
-              ...chapters.asMap().entries.map(
-                (entry) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: const Color(0xFFE4ECE7),
-                    child: Text(
-                      '${entry.key + 1}',
-                      style: const TextStyle(color: green),
-                    ),
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.92,
+          builder: (context, controller) => SafeArea(
+            child: ListView(
+              controller: controller,
+              padding: const EdgeInsets.all(20),
+              children: [
+                const Text(
+                  'فهرست کتاب',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: MarefatColors.ink,
                   ),
-                  title: Text(entry.value.title),
-                  trailing: _bookmarks.contains(entry.key)
-                      ? const Icon(Icons.bookmark_rounded, color: green)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _setChapter(entry.key);
-                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                ...chapters.asMap().entries.map(
+                  (entry) => ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    selected: entry.key == _chapter,
+                    selectedTileColor: MarefatColors.forest.withValues(
+                      alpha: 0.1,
+                    ),
+                    leading: CircleAvatar(
+                      backgroundColor: MarefatColors.mistDeep,
+                      child: Text(
+                        '${entry.key + 1}',
+                        style: const TextStyle(
+                          color: MarefatColors.forest,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      entry.value.title,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    trailing: _bookmarks.contains(entry.key)
+                        ? const Icon(
+                            Icons.bookmark_rounded,
+                            color: MarefatColors.forest,
+                          )
+                        : null,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _setChapter(entry.key);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -456,354 +498,546 @@ class _ReaderPageState extends State<ReaderPage> {
     }
   }
 
+  void _toggleChrome() {
+    setState(() => _chromeVisible = !_chromeVisible);
+    SystemChrome.setEnabledSystemUIMode(
+      _chromeVisible
+          ? SystemUiMode.edgeToEdge
+          : SystemUiMode.immersiveSticky,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final document = _document;
     final current = document == null ? null : document.chapters[_chapter];
+    final progressValue = document == null
+        ? 0.0
+        : (_chapter + 1) / document.chapters.length;
+
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: _background,
-        appBar: AppBar(
-          backgroundColor: _background,
-          leading: IconButton(
-            onPressed: () => Navigator.pop(context, _chapter),
-            icon: Icon(Icons.arrow_back_rounded, color: _foreground),
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                document?.title ?? widget.book.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: _foreground,
-                ),
-              ),
-              Text(
-                _isOffline
-                    ? (_contentDirection == TextDirection.ltr
-                          ? 'LTR · آماده برای مطالعه'
-                          : 'RTL · آماده برای مطالعه')
-                    : 'در حال بارگذاری',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: _foreground.withValues(alpha: .6),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            IconButton(
-              onPressed: _findInBook,
-              icon: Icon(Icons.search_rounded, color: _foreground),
-              tooltip: 'جست‌وجو در کتاب',
-            ),
-            IconButton(
-              onPressed: _toggleBookmark,
-              icon: Icon(
-                _bookmarks.contains(_chapter)
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                color: _foreground,
-              ),
-              tooltip: 'نشانک فصل',
-            ),
-            IconButton(
-              onPressed: _openSettings,
-              icon: Icon(Icons.tune_rounded, color: _foreground),
-              tooltip: 'تنظیمات',
-            ),
-            const SizedBox(width: 5),
-          ],
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: _theme == 2
+              ? Brightness.light
+              : Brightness.dark,
         ),
-        body: _loading
-            ? const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: green),
-                    SizedBox(height: 14),
-                    Text('کتاب در حال بارگذاری است…'),
-                  ],
-                ),
-              )
-            : _error != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.menu_book_outlined,
-                        color: green,
-                        size: 44,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('بازکردن کتاب ممکن نشد.'),
-                      const SizedBox(height: 10),
-                      Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.black54,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _loading = true;
-                            _error = null;
-                          });
-                          _load();
-                        },
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('تلاش دوباره'),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : Column(
-                children: [
-                  LinearProgressIndicator(
-                    value: (_chapter + 1) / document!.chapters.length,
-                    minHeight: 2,
-                    color: green,
-                    backgroundColor: _foreground.withValues(alpha: .08),
-                  ),
-                  Expanded(
-                    child: SelectionArea(
-                      onSelectionChanged: (selection) =>
-                          _selectedText = selection?.plainText ?? '',
-                      child: Scrollbar(
-                        controller: _scroll,
-                        child: SingleChildScrollView(
-                          controller: _scroll,
-                          padding: const EdgeInsets.fromLTRB(27, 30, 27, 30),
-                          child: Directionality(
-                            textDirection: _contentDirection,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        current!.title,
-                                        textAlign: _contentDirection ==
-                                                TextDirection.rtl
-                                            ? TextAlign.right
-                                            : TextAlign.left,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: green,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                    if (_bookmarks.contains(_chapter))
-                                      const Icon(
-                                        Icons.bookmark_rounded,
-                                        color: green,
-                                        size: 18,
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 23),
-                                SelectableText(
-                                  current.body,
-                                  textDirection: _contentDirection,
-                                  style: TextStyle(
-                                    fontSize: _fontSize,
-                                    height: _lineHeight,
-                                    color: _foreground,
-                                  ),
-                                  textAlign: _bodyAlign,
-                                ),
-                                if (_chapterHighlights.isNotEmpty) ...[
-                                  const SizedBox(height: 30),
-                                  Divider(
-                                    color: _foreground.withValues(alpha: .12),
-                                  ),
-                                  Directionality(
-                                    textDirection: TextDirection.rtl,
-                                    child: const Text(
-                                      'برجسته‌شده‌ها',
-                                      style: TextStyle(
-                                        color: green,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  ..._chapterHighlights.map(
-                                    (text) => Padding(
-                                      padding: const EdgeInsets.only(top: 10),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(11),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFFEDAA)
-                                              .withValues(
-                                                alpha: _theme == 2 ? .2 : .65,
-                                              ),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          text,
-                                          textDirection: _contentDirection,
-                                          style: TextStyle(
-                                            color: _foreground,
-                                            fontSize: 14,
-                                            height: 1.7,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 45),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(17, 7, 17, 14),
-                    decoration: BoxDecoration(
-                      color: _background,
-                      border: Border(
-                        top: BorderSide(
-                          color: _foreground.withValues(alpha: .08),
-                        ),
-                      ),
-                    ),
-                    child: Column(
+        child: Scaffold(
+          backgroundColor: _background,
+          body: _loading
+              ? _LoadingView(background: _background, foreground: _foreground)
+              : _error != null
+                  ? _ErrorView(
+                      background: _background,
+                      foreground: _foreground,
+                      error: _error!,
+                      onRetry: () {
+                        setState(() {
+                          _loading = true;
+                          _error = null;
+                        });
+                        _load();
+                      },
+                      onBack: () => Navigator.pop(context, _chapter),
+                    )
+                  : Stack(
                       children: [
-                        Row(
+                        Column(
                           children: [
-                            IconButton(
-                              onPressed: () => _setChapter(_chapter - 1),
-                              tooltip: 'فصل قبل',
-                              icon: Icon(
-                                Icons.chevron_left_rounded,
-                                color: _foreground,
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              height: _chromeVisible
+                                  ? MediaQuery.paddingOf(context).top + 56
+                                  : MediaQuery.paddingOf(context).top,
+                              color: _background,
+                              child: _chromeVisible
+                                  ? SafeArea(
+                                      bottom: false,
+                                      child: _ReaderAppBar(
+                                        title:
+                                            document?.title ?? widget.book.title,
+                                        subtitle: _isOffline
+                                            ? 'آماده برای مطالعهٔ آفلاین'
+                                            : 'همگام‌سازی شد',
+                                        foreground: _foreground,
+                                        bookmarked:
+                                            _bookmarks.contains(_chapter),
+                                        onBack: () =>
+                                            Navigator.pop(context, _chapter),
+                                        onSearch: _findInBook,
+                                        onBookmark: _toggleBookmark,
+                                        onSettings: _openSettings,
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                            LinearProgressIndicator(
+                              value: progressValue,
+                              minHeight: 2.5,
+                              color: MarefatColors.forest,
+                              backgroundColor: _foreground.withValues(
+                                alpha: 0.08,
                               ),
                             ),
                             Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'فصل ${_chapter + 1} از ${document.chapters.length}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: _foreground.withValues(alpha: .62),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onTap: _toggleChrome,
+                                child: SelectionArea(
+                                  onSelectionChanged: (selection) =>
+                                      _selectedText =
+                                          selection?.plainText ?? '',
+                                  child: Scrollbar(
+                                    controller: _scroll,
+                                    child: SingleChildScrollView(
+                                      controller: _scroll,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        28,
+                                        28,
+                                        28,
+                                        120,
+                                      ),
+                                      child: Directionality(
+                                        textDirection: _contentDirection,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            Text(
+                                              current!.title,
+                                              textAlign:
+                                                  _contentDirection ==
+                                                          TextDirection.rtl
+                                                      ? TextAlign.right
+                                                      : TextAlign.left,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: MarefatColors.forest,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 22),
+                                            SelectableText(
+                                              current.body,
+                                              textDirection: _contentDirection,
+                                              style: TextStyle(
+                                                fontSize: _fontSize,
+                                                height: _lineHeight,
+                                                color: _foreground,
+                                              ),
+                                              textAlign: _bodyAlign,
+                                            ),
+                                            if (_chapterHighlights
+                                                .isNotEmpty) ...[
+                                              const SizedBox(height: 30),
+                                              Divider(
+                                                color: _foreground.withValues(
+                                                  alpha: 0.12,
+                                                ),
+                                              ),
+                                              const Directionality(
+                                                textDirection:
+                                                    TextDirection.rtl,
+                                                child: Text(
+                                                  'برجسته‌شده‌ها',
+                                                  style: TextStyle(
+                                                    color: MarefatColors.forest,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                              ),
+                                              ..._chapterHighlights.map(
+                                                (text) => Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                    top: 10,
+                                                  ),
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                      12,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(
+                                                        0xFFFFEDAA,
+                                                      ).withValues(
+                                                        alpha: _theme == 2
+                                                            ? 0.2
+                                                            : 0.65,
+                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                        14,
+                                                      ),
+                                                    ),
+                                                    child: Text(
+                                                      text,
+                                                      textDirection:
+                                                          _contentDirection,
+                                                      style: TextStyle(
+                                                        color: _foreground,
+                                                        fontSize: 14,
+                                                        height: 1.7,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  if (document.chapters.length > 1)
-                                    Slider(
-                                      value: _chapter.toDouble(),
-                                      min: 0,
-                                      max: (document.chapters.length - 1)
-                                          .toDouble(),
-                                      onChanged: (value) =>
-                                          _setChapter(value.round()),
-                                      activeColor: green,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => _setChapter(_chapter + 1),
-                              tooltip: 'فصل بعد',
-                              icon: Icon(
-                                Icons.chevron_right_rounded,
-                                color: _foreground,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  onPressed: _addHighlight,
-                                  tooltip: 'برجسته‌سازی',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: Icon(
-                                    Icons.highlight_alt_rounded,
-                                    color: _foreground,
+                        if (_chromeVisible)
+                          Positioned(
+                            left: 14,
+                            right: 14,
+                            bottom: 14,
+                            child: SafeArea(
+                              top: false,
+                              child: _ReaderDock(
+                                foreground: _foreground,
+                                background: _background,
+                                chapter: _chapter,
+                                total: document!.chapters.length,
+                                fontSize: _fontSize,
+                                onPrev: () => _setChapter(_chapter - 1),
+                                onNext: () => _setChapter(_chapter + 1),
+                                onChapter: _setChapter,
+                                onHighlight: _addHighlight,
+                                onContents: _showContents,
+                                onFontDown: () {
+                                  setState(
+                                    () => _fontSize = (_fontSize - 1)
+                                        .clamp(17, 34)
+                                        .toDouble(),
+                                  );
+                                  _saveReaderSettings();
+                                },
+                                onFontUp: () {
+                                  setState(
+                                    () => _fontSize = (_fontSize + 1)
+                                        .clamp(17, 34)
+                                        .toDouble(),
+                                  );
+                                  _saveReaderSettings();
+                                },
+                              ).animate().fadeIn(duration: 220.ms).slideY(
+                                    begin: 0.12,
+                                    curve: Curves.easeOutCubic,
                                   ),
-                                ),
-                                IconButton(
-                                  onPressed: _showContents,
-                                  tooltip: 'فهرست',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: Icon(
-                                    Icons.list_rounded,
-                                    color: _foreground,
-                                  ),
-                                ),
-                              ],
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  onPressed: () {
-                                    setState(
-                                      () => _fontSize = (_fontSize - 1)
-                                          .clamp(17, 34)
-                                          .toDouble(),
-                                    );
-                                    _saveReaderSettings();
-                                  },
-                                  tooltip: 'کوچک‌تر',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: Icon(Icons.remove, color: _foreground),
-                                ),
-                                Text(
-                                  '${_fontSize.round()}',
-                                  style: TextStyle(color: _foreground),
-                                ),
-                                IconButton(
-                                  onPressed: () {
-                                    setState(
-                                      () => _fontSize = (_fontSize + 1)
-                                          .clamp(17, 34)
-                                          .toDouble(),
-                                    );
-                                    _saveReaderSettings();
-                                  },
-                                  tooltip: 'بزرگ‌تر',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: Icon(Icons.add, color: _foreground),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                          ),
                       ],
                     ),
-                  ),
-                ],
-              ),
+        ),
       ),
     );
   }
+}
+
+class _ReaderAppBar extends StatelessWidget {
+  const _ReaderAppBar({
+    required this.title,
+    required this.subtitle,
+    required this.foreground,
+    required this.bookmarked,
+    required this.onBack,
+    required this.onSearch,
+    required this.onBookmark,
+    required this.onSettings,
+  });
+
+  final String title;
+  final String subtitle;
+  final Color foreground;
+  final bool bookmarked;
+  final VoidCallback onBack;
+  final VoidCallback onSearch;
+  final VoidCallback onBookmark;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onBack,
+            icon: Icon(Icons.arrow_back_rounded, color: foreground),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: foreground,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: foreground.withValues(alpha: 0.55),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onSearch,
+            icon: Icon(Icons.search_rounded, color: foreground),
+            tooltip: 'جست‌وجو',
+          ),
+          IconButton(
+            onPressed: onBookmark,
+            icon: Icon(
+              bookmarked
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              color: foreground,
+            ),
+            tooltip: 'نشانک',
+          ),
+          IconButton(
+            onPressed: onSettings,
+            icon: Icon(Icons.tune_rounded, color: foreground),
+            tooltip: 'تنظیمات',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReaderDock extends StatelessWidget {
+  const _ReaderDock({
+    required this.foreground,
+    required this.background,
+    required this.chapter,
+    required this.total,
+    required this.fontSize,
+    required this.onPrev,
+    required this.onNext,
+    required this.onChapter,
+    required this.onHighlight,
+    required this.onContents,
+    required this.onFontDown,
+    required this.onFontUp,
+  });
+
+  final Color foreground;
+  final Color background;
+  final int chapter;
+  final int total;
+  final double fontSize;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final ValueChanged<int> onChapter;
+  final VoidCallback onHighlight;
+  final VoidCallback onContents;
+  final VoidCallback onFontDown;
+  final VoidCallback onFontUp;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+      decoration: BoxDecoration(
+        color: background.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: foreground.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: onPrev,
+                tooltip: 'فصل قبل',
+                icon: Icon(Icons.chevron_right_rounded, color: foreground),
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      'فصل ${chapter + 1} از $total',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: foreground.withValues(alpha: 0.65),
+                      ),
+                    ),
+                    if (total > 1)
+                      Slider(
+                        value: chapter.toDouble(),
+                        min: 0,
+                        max: (total - 1).toDouble(),
+                        onChanged: (value) => onChapter(value.round()),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onNext,
+                tooltip: 'فصل بعد',
+                icon: Icon(Icons.chevron_left_rounded, color: foreground),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: onHighlight,
+                    tooltip: 'برجسته‌سازی',
+                    icon: Icon(Icons.highlight_alt_rounded, color: foreground),
+                  ),
+                  IconButton(
+                    onPressed: onContents,
+                    tooltip: 'فهرست',
+                    icon: Icon(Icons.list_rounded, color: foreground),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: onFontDown,
+                    tooltip: 'کوچک‌تر',
+                    icon: Icon(Icons.remove_rounded, color: foreground),
+                  ),
+                  Text(
+                    '${fontSize.round()}',
+                    style: TextStyle(
+                      color: foreground,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onFontUp,
+                    tooltip: 'بزرگ‌تر',
+                    icon: Icon(Icons.add_rounded, color: foreground),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingView extends StatelessWidget {
+  const _LoadingView({required this.background, required this.foreground});
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: background,
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(color: MarefatColors.forest)
+              .animate(onPlay: (c) => c.repeat())
+              .shimmer(duration: 1200.ms, color: MarefatColors.brassSoft),
+          const SizedBox(height: 16),
+          Text(
+            'معرفت در حال گشودن کتاب است…',
+            style: TextStyle(
+              color: foreground.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({
+    required this.background,
+    required this.foreground,
+    required this.error,
+    required this.onRetry,
+    required this.onBack,
+  });
+
+  final Color background;
+  final Color foreground;
+  final String error;
+  final VoidCallback onRetry;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: background,
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.menu_book_outlined, color: MarefatColors.forest, size: 44),
+            const SizedBox(height: 12),
+            Text(
+              'بازکردن کتاب ممکن نشد.',
+              style: TextStyle(
+                color: foreground,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: foreground.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('تلاش دوباره'),
+            ),
+            TextButton(onPressed: onBack, child: const Text('بازگشت')),
+          ],
+        ),
+      ),
+    ),
+  );
 }
