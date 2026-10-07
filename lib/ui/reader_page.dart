@@ -880,7 +880,7 @@ class _ReaderDock extends StatelessWidget {
               IconButton(
                 onPressed: onPrev,
                 tooltip: 'فصل قبل',
-                icon: Icon(Icons.chevron_right_rounded, color: foreground),
+                icon: Icon(Icons.chevron_left_rounded, color: foreground),
               ),
               Expanded(
                 child: Column(
@@ -906,7 +906,7 @@ class _ReaderDock extends StatelessWidget {
               IconButton(
                 onPressed: onNext,
                 tooltip: 'فصل بعد',
-                icon: Icon(Icons.chevron_left_rounded, color: foreground),
+                icon: Icon(Icons.chevron_right_rounded, color: foreground),
               ),
             ],
           ),
