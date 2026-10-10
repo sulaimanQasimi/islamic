@@ -209,7 +209,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     if (fromJson.isNotEmpty) return fromJson;
 
     final legacy = prefs.getStringList('highlights_${widget.book.id}') ?? [];
-    if (legacy.isEmpty) return const [];
+    if (legacy.isEmpty) return <TextHighlight>[];
     return [
       for (final entry in legacy)
         if (entry.trim().isNotEmpty) TextHighlight.fromLegacy(entry),

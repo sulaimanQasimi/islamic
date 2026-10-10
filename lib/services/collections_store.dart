@@ -65,7 +65,7 @@ class CollectionsStore {
   static Future<List<BookCollection>> load() async {
     final prefs = await AppStorage.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null || raw.isEmpty) return const [];
+    if (raw == null || raw.isEmpty) return <BookCollection>[];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
       return list
@@ -74,7 +74,7 @@ class CollectionsStore {
           .where((c) => c.id.isNotEmpty)
           .toList();
     } catch (_) {
-      return const [];
+      return <BookCollection>[];
     }
   }
 
@@ -87,11 +87,11 @@ class CollectionsStore {
   }
 
   static Future<BookCollection> create(String name, {int colorIndex = 0}) async {
-    final items = await load();
+    final items = List<BookCollection>.from(await load());
     final collection = BookCollection(
       id: 'c_${DateTime.now().microsecondsSinceEpoch}',
       name: name.trim().isEmpty ? 'قفسهٔ جدید' : name.trim(),
-      bookIds: const [],
+      bookIds: <String>[],
       colorIndex: colorIndex,
     );
     items.insert(0, collection);
@@ -100,7 +100,7 @@ class CollectionsStore {
   }
 
   static Future<void> update(BookCollection collection) async {
-    final items = await load();
+    final items = List<BookCollection>.from(await load());
     final i = items.indexWhere((c) => c.id == collection.id);
     if (i < 0) return;
     items[i] = collection;
@@ -108,16 +108,16 @@ class CollectionsStore {
   }
 
   static Future<void> delete(String id) async {
-    final items = await load();
+    final items = List<BookCollection>.from(await load());
     items.removeWhere((c) => c.id == id);
     await save(items);
   }
 
   static Future<void> toggleBook(String collectionId, String bookId) async {
-    final items = await load();
+    final items = List<BookCollection>.from(await load());
     final i = items.indexWhere((c) => c.id == collectionId);
     if (i < 0) return;
-    final ids = [...items[i].bookIds];
+    final ids = List<String>.from(items[i].bookIds);
     if (ids.contains(bookId)) {
       ids.remove(bookId);
     } else {

@@ -43,7 +43,7 @@ class ReadingHistory {
   static Future<List<HistoryEntry>> load() async {
     final prefs = await AppStorage.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null || raw.isEmpty) return const [];
+    if (raw == null || raw.isEmpty) return <HistoryEntry>[];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
       return list
@@ -52,7 +52,7 @@ class ReadingHistory {
           .where((e) => e.bookId.isNotEmpty)
           .toList();
     } catch (_) {
-      return const [];
+      return <HistoryEntry>[];
     }
   }
 
@@ -63,7 +63,7 @@ class ReadingHistory {
     required int chapter,
   }) async {
     final prefs = await AppStorage.getInstance();
-    final items = await load();
+    final items = List<HistoryEntry>.from(await load());
     items.removeWhere((e) => e.bookId == bookId);
     items.insert(
       0,

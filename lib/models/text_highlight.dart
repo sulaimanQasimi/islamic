@@ -97,17 +97,17 @@ class TextHighlight {
   }
 
   static List<TextHighlight> decodeList(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return const [];
+    if (raw == null || raw.trim().isEmpty) return <TextHighlight>[];
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return const [];
+      if (decoded is! List) return <TextHighlight>[];
       return decoded
           .whereType<Map>()
           .map((e) => TextHighlight.fromJson(Map<String, dynamic>.from(e)))
           .where((h) => h.text.isNotEmpty)
           .toList();
     } catch (_) {
-      return const [];
+      return <TextHighlight>[];
     }
   }
 

@@ -55,7 +55,7 @@ class NotebookStore {
   static Future<List<NotebookEntry>> loadFreeNotes() async {
     final prefs = await AppStorage.getInstance();
     final raw = prefs.getString(_freeKey);
-    if (raw == null || raw.isEmpty) return const [];
+    if (raw == null || raw.isEmpty) return <NotebookEntry>[];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
       return list
@@ -63,7 +63,7 @@ class NotebookStore {
           .map((e) => NotebookEntry.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     } catch (_) {
-      return const [];
+      return <NotebookEntry>[];
     }
   }
 
@@ -82,7 +82,7 @@ class NotebookStore {
     required String text,
     String? note,
   }) async {
-    final notes = await loadFreeNotes();
+    final notes = List<NotebookEntry>.from(await loadFreeNotes());
     notes.insert(
       0,
       NotebookEntry(
@@ -100,7 +100,7 @@ class NotebookStore {
   }
 
   static Future<void> deleteFreeNote(String id) async {
-    final notes = await loadFreeNotes();
+    final notes = List<NotebookEntry>.from(await loadFreeNotes());
     notes.removeWhere((n) => n.id == id);
     await saveFreeNotes(notes);
   }
