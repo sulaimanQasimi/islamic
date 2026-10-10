@@ -24,7 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: "3.35.4"
+  # Must ship Dart >= 3.13.4 (see pubspec environment.sdk)
+  FLUTTER_VERSION: "3.47.7"
 
   # ─── HARDCODED SIGNING (private repo) ───────────────────────────
   # Generated keystore also committed at ci/release/upload-keystore.jks
