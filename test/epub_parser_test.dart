@@ -23,6 +23,18 @@ void main() {
       expect(book.title, isNotEmpty);
       expect(book.chapters, isNotEmpty);
       expect(book.chapters.first.body, isNotEmpty);
+      expect(book.chapters.first.html, isNotEmpty);
+      // Rich markup should survive parsing (not flattened to plain text only).
+      final hasMarkup = book.chapters.any(
+        (c) =>
+            c.html.contains('<p') ||
+            c.html.contains('<h') ||
+            c.html.contains('<img') ||
+            c.html.contains('<i') ||
+            c.html.contains('<em') ||
+            c.html.contains('<strong'),
+      );
+      expect(hasMarkup, isTrue);
     });
   }
 }

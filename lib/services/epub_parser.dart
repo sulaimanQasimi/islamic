@@ -6,9 +6,19 @@ import 'package:collection/collection.dart';
 import 'package:xml/xml.dart';
 
 class EpubChapter {
-  const EpubChapter({required this.title, required this.body});
+  const EpubChapter({
+    required this.title,
+    required this.body,
+    required this.html,
+  });
+
   final String title;
+
+  /// Plain text used for search / highlights.
   final String body;
+
+  /// Sanitized XHTML body fragment for rich rendering (images inlined as data URIs).
+  final String html;
 }
 
 class EpubDocument {
@@ -207,6 +217,7 @@ class EpubParser {
   }) {
     final archive = ZipDecoder().decodeBytes(bytes);
     final read = _textReader(archive);
+    final readBytes = _bytesReader(archive);
 
     final container = XmlDocument.parse(read('META-INF/container.xml'));
     final opfPath = container
@@ -241,31 +252,36 @@ class EpubParser {
     for (final ref in package.findAllElements('itemref')) {
       final path = manifest[ref.getAttribute('idref')];
       if (path == null) continue;
-      // Note: inline markup (italics, images, tables) is flattened to plain
-      // text; only paragraph structure is preserved.
-      final html = read(path)
-          .replaceAll(
-            RegExp(r'<(script|style)[^>]*>[\s\S]*?</\1>', caseSensitive: false),
-            ' ',
-          )
-          .replaceAll(
-            RegExp(
-              r'<br\s*/?>|</(p|div|li|h[1-6]|blockquote|section)>',
-              caseSensitive: false,
-            ),
-            '\n',
-          )
-          .replaceAll(RegExp(r'<[^>]+>'), ' ');
-      final body = _decodeEntities(html)
-          .replaceAll(RegExp(r'[ \t\r\f]+'), ' ')
-          .replaceAll(RegExp(r' *\n *'), '\n')
-          .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-          .trim();
-      if (body.isEmpty) continue;
+      final lower = path.toLowerCase();
+      if (!(lower.endsWith('.xhtml') ||
+          lower.endsWith('.html') ||
+          lower.endsWith('.htm') ||
+          lower.endsWith('.xml'))) {
+        continue;
+      }
+
+      String raw;
+      try {
+        raw = read(path);
+      } catch (_) {
+        continue;
+      }
+
+      final pageBase = path.contains('/')
+          ? path.substring(0, path.lastIndexOf('/') + 1)
+          : '';
+      final html = _prepareChapterHtml(raw, pageBase: pageBase, readBytes: readBytes);
+      final body = _htmlToPlainText(html);
+      final hasMedia = html.contains('<img');
+      if (body.isEmpty && !hasMedia) continue;
+
       chapters.add(
         EpubChapter(
-          title: titlesByPath[path] ?? 'فصل ${chapters.length + 1}',
-          body: body,
+          title: titlesByPath[path] ??
+              _headingTitle(html) ??
+              'فصل ${chapters.length + 1}',
+          body: body.isEmpty && hasMedia ? '〔تصویر〕' : body,
+          html: html,
         ),
       );
     }
@@ -277,6 +293,127 @@ class EpubParser {
       author: author?.isNotEmpty == true ? author! : fallbackAuthor,
       chapters: chapters,
     );
+  }
+
+  /// Keep structural/inline markup and inline images as data URIs.
+  static String _prepareChapterHtml(
+    String raw, {
+    required String pageBase,
+    required Uint8List? Function(String path) readBytes,
+  }) {
+    var html = raw;
+
+    // Drop head scripts; keep body-focused content when possible.
+    html = html.replaceAll(
+      RegExp(r'<(script)[^>]*>[\s\S]*?</\1>', caseSensitive: false),
+      '',
+    );
+
+    final bodyMatch = RegExp(
+      r'<body[^>]*>([\s\S]*?)</body>',
+      caseSensitive: false,
+    ).firstMatch(html);
+    if (bodyMatch != null) {
+      html = bodyMatch.group(1) ?? html;
+    }
+
+    // Remove leftover head-only style blocks that can confuse the renderer,
+    // but keep inline style attributes on elements.
+    html = html.replaceAll(
+      RegExp(r'<style[^>]*>[\s\S]*?</style>', caseSensitive: false),
+      '',
+    );
+
+    // Inline raster images so the reader doesn't need a filesystem.
+    html = html.replaceAllMapped(
+      RegExp(
+        r'''<img\b([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*)>''',
+        caseSensitive: false,
+      ),
+      (match) {
+        final before = match.group(1) ?? '';
+        final src = (match.group(2) ?? '').trim();
+        final after = match.group(3) ?? '';
+        if (src.isEmpty || src.startsWith('data:')) return match.group(0)!;
+        final cleaned = src.split('#').first.split('?').first;
+        final resolved = _normalize(
+          '$pageBase${Uri.decodeComponent(Uri.parse(cleaned).path)}',
+        );
+        final bytes = readBytes(resolved);
+        if (bytes == null || bytes.isEmpty) return match.group(0)!;
+        final mime = _mimeForPath(resolved);
+        final dataUri = 'data:$mime;base64,${base64Encode(bytes)}';
+        return '<img${before}src="$dataUri"$after>';
+      },
+    );
+
+    // SVG image references used by some cover wrappers.
+    html = html.replaceAllMapped(
+      RegExp(
+        r'''xlink:href\s*=\s*["']([^"']+\.(?:jpe?g|png|gif|webp))["']''',
+        caseSensitive: false,
+      ),
+      (match) {
+        final src = match.group(1)!.trim();
+        if (src.startsWith('data:')) return match.group(0)!;
+        final resolved = _normalize(
+          '$pageBase${Uri.decodeComponent(Uri.parse(src).path)}',
+        );
+        final bytes = readBytes(resolved);
+        if (bytes == null || bytes.isEmpty) return match.group(0)!;
+        final mime = _mimeForPath(resolved);
+        return 'xlink:href="data:$mime;base64,${base64Encode(bytes)}"';
+      },
+    );
+
+    // Strip dangerous / useless tags but keep their text when relevant.
+    html = html.replaceAll(
+      RegExp(r'</?(?:iframe|object|embed|form|input|button)[^>]*>', caseSensitive: false),
+      '',
+    );
+
+    return html.trim();
+  }
+
+  static String _htmlToPlainText(String html) {
+    final stripped = html
+        .replaceAll(
+          RegExp(r'<(script|style)[^>]*>[\s\S]*?</\1>', caseSensitive: false),
+          ' ',
+        )
+        .replaceAll(
+          RegExp(
+            r'<br\s*/?>|</(p|div|li|h[1-6]|blockquote|section|tr)>',
+            caseSensitive: false,
+          ),
+          '\n',
+        )
+        .replaceAll(RegExp(r'<[^>]+>'), ' ');
+    return _decodeEntities(stripped)
+        .replaceAll(RegExp(r'[ \t\r\f]+'), ' ')
+        .replaceAll(RegExp(r' *\n *'), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+  }
+
+  static String _mimeForPath(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.svg')) return 'image/svg+xml';
+    return 'image/jpeg';
+  }
+
+  static String? _headingTitle(String html) {
+    final match = RegExp(
+      r'<h([1-3])[^>]*>([\s\S]*?)</h\1>',
+      caseSensitive: false,
+    ).firstMatch(html);
+    if (match == null) return null;
+    final text = _htmlToPlainText(match.group(2) ?? '').trim();
+    if (text.isEmpty || text.length > 80) return null;
+    return text;
   }
 
   /// Maps normalized content paths to chapter titles from the NCX table of
