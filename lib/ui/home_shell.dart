@@ -125,8 +125,9 @@ class _HomeShellState extends State<HomeShell> {
             await BookCache.writeCover(book.id, cover);
           }
         }
-        if (cover != null && cover.isNotEmpty && mounted) {
-          setState(() => _covers[book.id] = cover);
+        final bytes = cover;
+        if (bytes != null && bytes.isNotEmpty && mounted) {
+          setState(() => _covers[book.id] = bytes);
         }
       } catch (error) {
         debugPrint('Cover extract failed for ${book.id}: $error');
