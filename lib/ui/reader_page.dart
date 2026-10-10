@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_html/flutter_html.dart';
 
 import '../models/book.dart';
 import '../services/app_storage.dart';
@@ -9,6 +8,7 @@ import '../services/book_backend.dart';
 import '../services/book_cache.dart';
 import '../services/epub_parser.dart';
 import '../theme/marefat_theme.dart';
+import '../widgets/epub_html_view.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({super.key, required this.book, required this.backend});
@@ -175,133 +175,6 @@ class _ReaderPageState extends State<ReaderPage> {
       .replaceAll('>', '&gt;')
       .replaceAll('\n\n', '</p><p>')
       .replaceAll('\n', '<br/>');
-
-  Map<String, Style> _readerHtmlStyles() {
-    final base = Style(
-      fontSize: FontSize(_fontSize),
-      lineHeight: LineHeight(_lineHeight),
-      color: _foreground,
-      textAlign: _bodyAlign,
-      direction: _contentDirection,
-      margin: Margins.zero,
-      padding: HtmlPaddings.zero,
-    );
-    Style heading(double scale) => Style(
-      fontSize: FontSize(_fontSize * scale),
-      lineHeight: LineHeight((_lineHeight * 0.92).clamp(1.2, 2.2)),
-      color: _foreground,
-      fontWeight: FontWeight.w800,
-      textAlign: _bodyAlign,
-      direction: _contentDirection,
-      margin: Margins.only(top: 18, bottom: 10),
-    );
-
-    return {
-      'html': Style(backgroundColor: Colors.transparent),
-      'body': base,
-      'div': base,
-      'span': Style(
-        fontSize: FontSize(_fontSize),
-        lineHeight: LineHeight(_lineHeight),
-        color: _foreground,
-        direction: _contentDirection,
-      ),
-      'p': Style(
-        fontSize: FontSize(_fontSize),
-        lineHeight: LineHeight(_lineHeight),
-        color: _foreground,
-        textAlign: _bodyAlign,
-        direction: _contentDirection,
-        margin: Margins.only(bottom: 14),
-      ),
-      'h1': heading(1.45),
-      'h2': heading(1.3),
-      'h3': heading(1.18),
-      'h4': heading(1.1),
-      'h5': heading(1.05),
-      'h6': heading(1.0),
-      'i': Style(fontStyle: FontStyle.italic, color: _foreground),
-      'em': Style(fontStyle: FontStyle.italic, color: _foreground),
-      'b': Style(fontWeight: FontWeight.w800, color: _foreground),
-      'strong': Style(fontWeight: FontWeight.w800, color: _foreground),
-      'blockquote': Style(
-        fontSize: FontSize(_fontSize),
-        lineHeight: LineHeight(_lineHeight),
-        color: _foreground.withValues(alpha: 0.92),
-        fontStyle: FontStyle.italic,
-        padding: HtmlPaddings.symmetric(horizontal: 14, vertical: 8),
-        margin: Margins.symmetric(vertical: 12),
-        border: Border(
-          right: _contentDirection == TextDirection.rtl
-              ? BorderSide(color: MarefatColors.forest.withValues(alpha: 0.45), width: 3)
-              : BorderSide.none,
-          left: _contentDirection == TextDirection.ltr
-              ? BorderSide(color: MarefatColors.forest.withValues(alpha: 0.45), width: 3)
-              : BorderSide.none,
-        ),
-      ),
-      'ul': Style(
-        margin: Margins.only(bottom: 12),
-        padding: HtmlPaddings.only(
-          right: _contentDirection == TextDirection.rtl ? 18 : 0,
-          left: _contentDirection == TextDirection.ltr ? 18 : 0,
-        ),
-        color: _foreground,
-        fontSize: FontSize(_fontSize),
-        lineHeight: LineHeight(_lineHeight),
-      ),
-      'ol': Style(
-        margin: Margins.only(bottom: 12),
-        padding: HtmlPaddings.only(
-          right: _contentDirection == TextDirection.rtl ? 18 : 0,
-          left: _contentDirection == TextDirection.ltr ? 18 : 0,
-        ),
-        color: _foreground,
-        fontSize: FontSize(_fontSize),
-        lineHeight: LineHeight(_lineHeight),
-      ),
-      'li': Style(
-        color: _foreground,
-        fontSize: FontSize(_fontSize),
-        lineHeight: LineHeight(_lineHeight),
-        margin: Margins.only(bottom: 6),
-      ),
-      'a': Style(
-        color: MarefatColors.forest,
-        textDecoration: TextDecoration.underline,
-      ),
-      'hr': Style(
-        margin: Margins.symmetric(vertical: 16),
-        border: Border(top: BorderSide(color: _foreground.withValues(alpha: 0.15))),
-      ),
-      'table': Style(
-        color: _foreground,
-        fontSize: FontSize(_fontSize * 0.92),
-        margin: Margins.symmetric(vertical: 12),
-      ),
-      'td': Style(
-        padding: HtmlPaddings.all(6),
-        color: _foreground,
-        fontSize: FontSize(_fontSize * 0.92),
-        border: Border.all(color: _foreground.withValues(alpha: 0.12)),
-      ),
-      'th': Style(
-        padding: HtmlPaddings.all(6),
-        color: _foreground,
-        fontWeight: FontWeight.w800,
-        fontSize: FontSize(_fontSize * 0.92),
-        border: Border.all(color: _foreground.withValues(alpha: 0.12)),
-      ),
-      'img': Style(
-        width: Width(100, Unit.percent),
-        alignment: Alignment.center,
-        margin: Margins.symmetric(vertical: 14),
-        display: Display.block,
-      ),
-      'sup': Style(fontSize: FontSize(_fontSize * 0.72)),
-      'sub': Style(fontSize: FontSize(_fontSize * 0.72)),
-    };
-  }
 
   void _setChapter(int value) {
     if (_document == null) return;
@@ -754,11 +627,17 @@ class _ReaderPageState extends State<ReaderPage> {
                                               ),
                                             ),
                                             const SizedBox(height: 22),
-                                            Html(
-                                              data: current.html.isNotEmpty
+                                            EpubHtmlView(
+                                              html: current.html.isNotEmpty
                                                   ? current.html
                                                   : '<p>${_escapeHtml(current.body)}</p>',
-                                              style: _readerHtmlStyles(),
+                                              style: TextStyle(
+                                                fontSize: _fontSize,
+                                                height: _lineHeight,
+                                                color: _foreground,
+                                              ),
+                                              textAlign: _bodyAlign,
+                                              textDirection: _contentDirection,
                                             ),
                                             if (_chapterHighlights
                                                 .isNotEmpty) ...[
