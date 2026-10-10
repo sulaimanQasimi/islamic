@@ -97,6 +97,19 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Accept Android SDK licenses
+        run: |
+          set -euo pipefail
+          yes | flutter doctor --android-licenses >/tmp/android-licenses.log 2>&1 || true
+          # Also accept via sdkmanager when available (covers NDK packages)
+          if command -v sdkmanager >/dev/null 2>&1; then
+            yes | sdkmanager --licenses >/tmp/sdkmanager-licenses.log 2>&1 || true
+          elif [ -x "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager" --licenses \
+              >/tmp/sdkmanager-licenses.log 2>&1 || true
+          fi
+          echo "Android licenses accepted (best-effort)"
+
       - name: Build signed APK
         run: >
           flutter build apk --release

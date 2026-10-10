@@ -16,8 +16,8 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.example.islamic"
     compileSdk = flutter.compileSdkVersion
-    // Use the installed NDK to avoid sdkmanager auto-download failures on Windows.
-    ndkVersion = "29.0.13846066"
+    // Use Flutter's recommended NDK (avoids hardcoding a preview NDK that CI can't license).
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
