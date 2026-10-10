@@ -1,0 +1,257 @@
+# Builds and signs Android + Windows when you push a version tag.
+# Example:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# Private repo: signing values are hardcoded below (no GitHub Actions secrets).
+# Paste your real values into SIGNING_* env vars.
+# For the keystore, either:
+#   A) put base64 into ANDROID_KEYSTORE_BASE64, or
+#   B) commit the file at ci/release/upload-keystore.jks
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.35.4"
+
+  # ─── HARDCODED SIGNING (private repo) ───────────────────────────
+  # Generated keystore also committed at ci/release/upload-keystore.jks
+  ANDROID_KEYSTORE_BASE64: "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"
+  ANDROID_KEYSTORE_PASSWORD: "MarefatRelease!2026"
+  ANDROID_KEY_ALIAS: "marefat"
+  ANDROID_KEY_PASSWORD: "MarefatRelease!2026"
+
+  # Windows Authenticode (self-signed; also at ci/release/windows.pfx)
+  WINDOWS_CERTIFICATE_BASE64: "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"
+  WINDOWS_CERTIFICATE_PASSWORD: "MarefatRelease!2026"
+  # ────────────────────────────────────────────────────────────────
+
+jobs:
+  android:
+    name: Android (signed)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building Android $VERSION (run ${GITHUB_RUN_NUMBER})"
+
+      - name: Prepare Android signing
+        run: |
+          set -euo pipefail
+          DEST="android/app/upload-keystore.jks"
+
+          if [ -f "ci/release/upload-keystore.jks" ]; then
+            cp "ci/release/upload-keystore.jks" "$DEST"
+            echo "Using committed keystore: ci/release/upload-keystore.jks"
+          elif [ -n "${{ env.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ env.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$DEST"
+            echo "Using ANDROID_KEYSTORE_BASE64 from workflow env"
+          else
+            echo "::error::No keystore. Set ANDROID_KEYSTORE_BASE64 in release.yml or add ci/release/upload-keystore.jks"
+            exit 1
+          fi
+
+
+          {
+            echo "storePassword=${{ env.ANDROID_KEYSTORE_PASSWORD }}"
+            echo "keyPassword=${{ env.ANDROID_KEY_PASSWORD }}"
+            echo "keyAlias=${{ env.ANDROID_KEY_ALIAS }}"
+            echo "storeFile=upload-keystore.jks"
+          } > android/key.properties
+          echo "Wrote android/key.properties"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build signed APK
+        run: >
+          flutter build apk --release
+          --build-name=${{ steps.ver.outputs.version }}
+          --build-number=${{ github.run_number }}
+
+      - name: Build signed App Bundle
+        run: >
+          flutter build appbundle --release
+          --build-name=${{ steps.ver.outputs.version }}
+          --build-number=${{ github.run_number }}
+
+      - name: Collect Android artifacts
+        run: |
+          mkdir -p dist/android
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "dist/android/marefat-${{ steps.ver.outputs.version }}.apk"
+          cp build/app/outputs/bundle/release/app-release.aab \
+            "dist/android/marefat-${{ steps.ver.outputs.version }}.aab"
+          ls -lh dist/android
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: dist/android/*
+          if-no-files-found: error
+
+  windows:
+    name: Windows (release)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve version from tag
+        id: ver
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Build Windows release
+        run: >
+          flutter build windows --release
+          --build-name=${{ steps.ver.outputs.version }}
+          --build-number=${{ github.run_number }}
+
+      - name: Sign Windows executable (optional)
+        shell: pwsh
+        run: |
+          $pfxPath = $null
+
+          if (Test-Path "ci\release\windows.pfx") {
+            $pfxPath = "ci\release\windows.pfx"
+            Write-Host "Using committed PFX: ci/release/windows.pfx"
+          } elseif (-not [string]::IsNullOrWhiteSpace("${{ env.WINDOWS_CERTIFICATE_BASE64 }}")) {
+            $pfxPath = Join-Path $env:RUNNER_TEMP "windows-cert.pfx"
+            [IO.File]::WriteAllBytes(
+              $pfxPath,
+              [Convert]::FromBase64String("${{ env.WINDOWS_CERTIFICATE_BASE64 }}")
+            )
+            Write-Host "Using WINDOWS_CERTIFICATE_BASE64 from workflow env"
+          } else {
+            Write-Host "No Windows certificate configured — shipping unsigned build."
+            exit 0
+          }
+
+          $password = "${{ env.WINDOWS_CERTIFICATE_PASSWORD }}"
+
+          $releaseDir = "build\windows\x64\runner\Release"
+          $exe = Get-ChildItem -Path $releaseDir -Filter "*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "Windows exe not found in $releaseDir" }
+
+          $signtool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1
+
+          if (-not $signtool) { throw "signtool.exe not found" }
+
+          & $signtool.FullName sign `
+            /f $pfxPath `
+            /p $password `
+            /fd SHA256 `
+            /tr http://timestamp.digicert.com `
+            /td SHA256 `
+            $exe.FullName
+
+          Write-Host "Signed $($exe.FullName)"
+
+      - name: Package Windows zip
+        shell: bash
+        run: |
+          mkdir -p dist/windows
+          VERSION="${{ steps.ver.outputs.version }}"
+          RELEASE_DIR="build/windows/x64/runner/Release"
+          ZIP_PATH="dist/windows/marefat-${VERSION}-windows-x64.zip"
+          powershell -NoProfile -Command \
+            "Compress-Archive -Path '${RELEASE_DIR}\\*' -DestinationPath '${ZIP_PATH}' -Force"
+          ls -lh dist/windows
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: dist/windows/*
+          if-no-files-found: error
+
+  publish:
+    name: GitHub Release
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: dist/android
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: dist/windows
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: معرفت ${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/android/*
+            dist/windows/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

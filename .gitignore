@@ -44,6 +44,17 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Signing / release credentials
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
+secrets/
+# Private-repo CI signing files ARE committed intentionally
+!ci/release/
+!ci/release/**
+
 # Local build helpers (kept off C: due to disk space)
 .gradle-home/
 .tmp/
