@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// Copy / share helpers for text and files (PDF).
+/// Uses the classic [Share] API for broad share_plus compatibility.
 class ShareHelper {
   ShareHelper._();
 
@@ -17,9 +18,7 @@ class ShareHelper {
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
-    await SharePlus.instance.share(
-      ShareParams(text: trimmed, subject: subject),
-    );
+    await Share.share(trimmed, subject: subject);
   }
 
   /// Copy then open the system share sheet.
@@ -42,19 +41,17 @@ class ShareHelper {
         fileName.replaceAll(RegExp(r'[^\w\.\-\u0600-\u06FF]+'), '_');
     final mime = mimeType ?? _mimeFor(safeName);
 
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [
-          XFile.fromData(
-            bytes,
-            mimeType: mime,
-            name: safeName,
-          ),
-        ],
-        fileNameOverrides: [safeName],
-        text: text,
-        subject: subject,
-      ),
+    await Share.shareXFiles(
+      [
+        XFile.fromData(
+          bytes,
+          mimeType: mime,
+          name: safeName,
+        ),
+      ],
+      text: text,
+      subject: subject,
+      fileNameOverrides: [safeName],
     );
   }
 
