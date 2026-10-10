@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -13,6 +15,7 @@ Future<void> showBookDetailSheet({
   required bool isFavorite,
   required VoidCallback onToggleFavorite,
   required VoidCallback onOpen,
+  Uint8List? coverBytes,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -20,6 +23,7 @@ Future<void> showBookDetailSheet({
     backgroundColor: Colors.transparent,
     builder: (context) => _BookDetailSheet(
       book: book,
+      coverBytes: coverBytes,
       progress: progress,
       chapterCount: chapterCount,
       isFavorite: isFavorite,
@@ -37,9 +41,11 @@ class _BookDetailSheet extends StatefulWidget {
     required this.isFavorite,
     required this.onToggleFavorite,
     required this.onOpen,
+    this.coverBytes,
   });
 
   final Book book;
+  final Uint8List? coverBytes;
   final int progress;
   final int chapterCount;
   final bool isFavorite;
@@ -94,6 +100,7 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                       width: 118,
                       child: BookCoverCard(
                         book: book,
+                        coverBytes: widget.coverBytes,
                         onTap: () {},
                         compact: true,
                         progress: progress,

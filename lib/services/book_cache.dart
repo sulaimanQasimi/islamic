@@ -7,4 +7,8 @@ class BookCache {
   static Future<void> write(String id, Uint8List bytes) =>
       cache.write(id, bytes);
   static Future<bool> contains(String id) => cache.contains(id);
+
+  static Future<Uint8List?> readCover(String id) => cache.readCover(id);
+  static Future<void> writeCover(String id, Uint8List bytes) =>
+      cache.writeCover(id, bytes);
 }

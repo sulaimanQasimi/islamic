@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/book.dart';
 import '../services/app_storage.dart';
 import '../services/book_backend.dart';
+import '../services/book_cache.dart';
+import '../services/epub_parser.dart';
 import '../theme/marefat_theme.dart';
 import '../widgets/book_cover_card.dart';
 import '../widgets/book_detail_sheet.dart';
@@ -30,6 +33,7 @@ class _HomeShellState extends State<HomeShell> {
   Set<String> _favorites = {};
   Map<String, int> _progress = {};
   Map<String, int> _chapterCounts = {};
+  final Map<String, Uint8List> _covers = {};
   String _category = 'همه';
   LibrarySort _sort = LibrarySort.featured;
   int _tab = 0;
@@ -71,6 +75,7 @@ class _HomeShellState extends State<HomeShell> {
         _applyPrefs(prefs, books);
         _loading = false;
       });
+      _loadCovers(books);
     } catch (e) {
       if (!mounted) return;
       final prefs = await AppStorage.getInstance();
@@ -88,6 +93,7 @@ class _HomeShellState extends State<HomeShell> {
             _loading = false;
             _error = null;
           });
+          _loadCovers(books);
           return;
         } catch (restoreError) {
           debugPrint('Could not restore cached catalog: $restoreError');
@@ -97,6 +103,34 @@ class _HomeShellState extends State<HomeShell> {
         _loading = false;
         _error = e.toString();
       });
+    }
+  }
+
+  /// Pull cover / first-page images from each EPUB (cached after first extract).
+  Future<void> _loadCovers(List<Book> books) async {
+    for (final book in books) {
+      if (!mounted) return;
+      if (_covers.containsKey(book.id)) continue;
+
+      try {
+        var cover = await BookCache.readCover(book.id);
+        if (cover == null || cover.isEmpty) {
+          final cachedEpub = await BookCache.read(book.id);
+          final epubBytes = cachedEpub ?? await _backend.downloadBytes(book);
+          if (cachedEpub == null) {
+            await BookCache.write(book.id, epubBytes);
+          }
+          cover = EpubParser.extractCover(epubBytes);
+          if (cover != null && cover.isNotEmpty) {
+            await BookCache.writeCover(book.id, cover);
+          }
+        }
+        if (cover != null && cover.isNotEmpty && mounted) {
+          setState(() => _covers[book.id] = cover);
+        }
+      } catch (error) {
+        debugPrint('Cover extract failed for ${book.id}: $error');
+      }
     }
   }
 
@@ -229,6 +263,7 @@ class _HomeShellState extends State<HomeShell> {
     await showBookDetailSheet(
       context: context,
       book: book,
+      coverBytes: _covers[book.id],
       progress: _progress[book.id] ?? 0,
       chapterCount: _chapterCounts[book.id] ?? 1,
       isFavorite: _favorites.contains(book.id),
@@ -264,6 +299,7 @@ class _HomeShellState extends State<HomeShell> {
                             favorites: _favorites,
                             progress: _progress,
                             chapterCounts: _chapterCounts,
+                            covers: _covers,
                             category: _category,
                             sort: _sort,
                             gridView: _gridView,
@@ -284,6 +320,7 @@ class _HomeShellState extends State<HomeShell> {
                             favorites: _favorites,
                             progress: _progress,
                             chapterCounts: _chapterCounts,
+                            covers: _covers,
                             onChanged: () => setState(() {}),
                             onOpen: _showDetail,
                             onFavorite: _toggleFavorite,
@@ -293,6 +330,7 @@ class _HomeShellState extends State<HomeShell> {
                             favorites: _favorites,
                             progress: _progress,
                             chapterCounts: _chapterCounts,
+                            covers: _covers,
                             gridView: _gridView,
                             onOpen: _showDetail,
                             onFavorite: _toggleFavorite,
@@ -408,6 +446,7 @@ class _LibraryTab extends StatelessWidget {
     required this.favorites,
     required this.progress,
     required this.chapterCounts,
+    required this.covers,
     required this.category,
     required this.sort,
     required this.gridView,
@@ -430,6 +469,7 @@ class _LibraryTab extends StatelessWidget {
   final Set<String> favorites;
   final Map<String, int> progress;
   final Map<String, int> chapterCounts;
+  final Map<String, Uint8List> covers;
   final String category;
   final LibrarySort sort;
   final bool gridView;
@@ -474,6 +514,7 @@ class _LibraryTab extends StatelessWidget {
                 books: continueReading,
                 progress: progress,
                 chapterCounts: chapterCounts,
+                covers: covers,
                 onOpen: onOpen,
               ),
             ),
@@ -484,6 +525,7 @@ class _LibraryTab extends StatelessWidget {
                 favorites: favorites,
                 progress: progress,
                 chapterCounts: chapterCounts,
+                covers: covers,
                 onDetail: onDetail,
                 onFavorite: onFavorite,
               ),
@@ -525,6 +567,7 @@ class _LibraryTab extends StatelessWidget {
                   return BookCoverCard(
                     book: book,
                     index: index,
+                    coverBytes: covers[book.id],
                     progress: progress[book.id] ?? 0,
                     chapterCount: chapterCounts[book.id] ?? 1,
                     isFavorite: favorites.contains(book.id),
@@ -544,6 +587,7 @@ class _LibraryTab extends StatelessWidget {
                   final book = books[index];
                   return _BookListTile(
                     book: book,
+                    coverBytes: covers[book.id],
                     progress: progress[book.id] ?? 0,
                     chapterCount: chapterCounts[book.id] ?? 1,
                     isFavorite: favorites.contains(book.id),
@@ -759,12 +803,14 @@ class _ContinueSection extends StatelessWidget {
     required this.books,
     required this.progress,
     required this.chapterCounts,
+    required this.covers,
     required this.onOpen,
   });
 
   final List<Book> books;
   final Map<String, int> progress;
   final Map<String, int> chapterCounts;
+  final Map<String, Uint8List> covers;
   final ValueChanged<Book> onOpen;
 
   @override
@@ -810,19 +856,31 @@ class _ContinueSection extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 54,
-                          height: 78,
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: MarefatColors.brassSoft.withValues(
-                                alpha: 0.55,
-                              ),
-                            ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: SizedBox(
+                            width: 54,
+                            height: 78,
+                            child: covers[book.id] != null
+                                ? Image.memory(
+                                    covers[book.id]!,
+                                    fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                  )
+                                : DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black26,
+                                      border: Border.all(
+                                        color: MarefatColors.brassSoft
+                                            .withValues(alpha: 0.55),
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      book.icon,
+                                      color: MarefatColors.brassSoft,
+                                    ),
+                                  ),
                           ),
-                          child: Icon(book.icon, color: MarefatColors.brassSoft),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -880,6 +938,7 @@ class _FeaturedSection extends StatelessWidget {
     required this.favorites,
     required this.progress,
     required this.chapterCounts,
+    required this.covers,
     required this.onDetail,
     required this.onFavorite,
   });
@@ -888,6 +947,7 @@ class _FeaturedSection extends StatelessWidget {
   final Set<String> favorites;
   final Map<String, int> progress;
   final Map<String, int> chapterCounts;
+  final Map<String, Uint8List> covers;
   final ValueChanged<Book> onDetail;
   final ValueChanged<String> onFavorite;
 
@@ -917,6 +977,7 @@ class _FeaturedSection extends StatelessWidget {
                 child: BookCoverCard(
                   book: book,
                   index: index,
+                  coverBytes: covers[book.id],
                   progress: progress[book.id] ?? 0,
                   chapterCount: chapterCounts[book.id] ?? 1,
                   isFavorite: favorites.contains(book.id),
@@ -1063,9 +1124,11 @@ class _BookListTile extends StatelessWidget {
     required this.isFavorite,
     required this.onTap,
     required this.onFavorite,
+    this.coverBytes,
   });
 
   final Book book;
+  final Uint8List? coverBytes;
   final int progress;
   final int chapterCount;
   final bool isFavorite;
@@ -1095,21 +1158,35 @@ class _BookListTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 54,
-                height: 74,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      book.color,
-                      Color.lerp(book.color, Colors.black, 0.4)!,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 54,
+                  height: 74,
+                  child: coverBytes != null
+                      ? Image.memory(
+                          coverBytes!,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        )
+                      : DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topRight,
+                              end: Alignment.bottomLeft,
+                              colors: [
+                                book.color,
+                                Color.lerp(book.color, Colors.black, 0.4)!,
+                              ],
+                            ),
+                          ),
+                          child: Icon(
+                            book.icon,
+                            color: MarefatColors.brassSoft,
+                            size: 22,
+                          ),
+                        ),
                 ),
-                child: Icon(book.icon, color: MarefatColors.brassSoft, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1171,6 +1248,7 @@ class _SearchTab extends StatelessWidget {
     required this.favorites,
     required this.progress,
     required this.chapterCounts,
+    required this.covers,
     required this.onChanged,
     required this.onOpen,
     required this.onFavorite,
@@ -1181,6 +1259,7 @@ class _SearchTab extends StatelessWidget {
   final Set<String> favorites;
   final Map<String, int> progress;
   final Map<String, int> chapterCounts;
+  final Map<String, Uint8List> covers;
   final VoidCallback onChanged;
   final ValueChanged<Book> onOpen;
   final ValueChanged<String> onFavorite;
@@ -1242,6 +1321,7 @@ class _SearchTab extends StatelessWidget {
                     final book = books[index];
                     return _BookListTile(
                       book: book,
+                      coverBytes: covers[book.id],
                       progress: progress[book.id] ?? 0,
                       chapterCount: chapterCounts[book.id] ?? 1,
                       isFavorite: favorites.contains(book.id),
@@ -1262,6 +1342,7 @@ class _FavoritesTab extends StatelessWidget {
     required this.favorites,
     required this.progress,
     required this.chapterCounts,
+    required this.covers,
     required this.gridView,
     required this.onOpen,
     required this.onFavorite,
@@ -1272,6 +1353,7 @@ class _FavoritesTab extends StatelessWidget {
   final Set<String> favorites;
   final Map<String, int> progress;
   final Map<String, int> chapterCounts;
+  final Map<String, Uint8List> covers;
   final bool gridView;
   final ValueChanged<Book> onOpen;
   final ValueChanged<String> onFavorite;
@@ -1341,6 +1423,7 @@ class _FavoritesTab extends StatelessWidget {
                 return BookCoverCard(
                   book: book,
                   index: index,
+                  coverBytes: covers[book.id],
                   progress: progress[book.id] ?? 0,
                   chapterCount: chapterCounts[book.id] ?? 1,
                   isFavorite: favorites.contains(book.id),
@@ -1360,6 +1443,7 @@ class _FavoritesTab extends StatelessWidget {
                 final book = books[index];
                 return _BookListTile(
                   book: book,
+                  coverBytes: covers[book.id],
                   progress: progress[book.id] ?? 0,
                   chapterCount: chapterCounts[book.id] ?? 1,
                   isFavorite: favorites.contains(book.id),

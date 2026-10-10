@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -9,6 +11,7 @@ class BookCoverCard extends StatelessWidget {
     super.key,
     required this.book,
     required this.onTap,
+    this.coverBytes,
     this.progress = 0,
     this.chapterCount = 1,
     this.isFavorite = false,
@@ -19,6 +22,7 @@ class BookCoverCard extends StatelessWidget {
 
   final Book book;
   final VoidCallback onTap;
+  final Uint8List? coverBytes;
   final int progress;
   final int chapterCount;
   final bool isFavorite;
@@ -32,6 +36,7 @@ class BookCoverCard extends StatelessWidget {
   }
 
   bool get _hasStarted => progress > 0;
+  bool get _hasCover => coverBytes != null && coverBytes!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -74,144 +79,138 @@ class BookCoverCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topRight,
-                            end: Alignment.bottomLeft,
-                            colors: [
-                              book.color,
-                              Color.lerp(book.color, Colors.black, 0.45)!,
-                              Color.lerp(book.color, const Color(0xFF0A1A18), 0.65)!,
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: Container(
-                          margin: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: gold.withValues(alpha: 0.75),
-                              width: 1.4,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: Container(
-                          margin: const EdgeInsets.all(13),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: darkGold.withValues(alpha: 0.45),
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 16,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.centerRight,
-                              end: Alignment.centerLeft,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.45),
-                                Colors.transparent,
-                              ],
+                      if (_hasCover)
+                        Image.memory(
+                          coverBytes!,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          errorBuilder: (_, __, ___) => _FallbackArt(book: book),
+                        )
+                      else
+                        _FallbackArt(book: book),
+                      if (!_hasCover) ...[
+                        Positioned.fill(
+                          child: Container(
+                            margin: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: gold.withValues(alpha: 0.75),
+                                width: 1.4,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        top: 18,
-                        left: 18,
-                        right: 18,
-                        height: 46,
-                        child: CustomPaint(
-                          painter: ArchOrnamentPainter(
-                            color: gold.withValues(alpha: 0.7),
+                        Positioned.fill(
+                          child: Container(
+                            margin: const EdgeInsets.all(13),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: darkGold.withValues(alpha: 0.45),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 28, 18, 18),
-                        child: Column(
-                          children: [
-                            const Spacer(flex: 2),
-                            Text(
-                              book.title,
-                              textAlign: TextAlign.center,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFFFFF6DF),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                height: 1.35,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black87,
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                  ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 16,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerRight,
+                                end: Alignment.centerLeft,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.45),
+                                  Colors.transparent,
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Divider(
-                                    color: gold.withValues(alpha: 0.4),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                  child: Icon(
-                                    book.icon,
-                                    size: 13,
-                                    color: gold.withValues(alpha: 0.85),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Divider(
-                                    color: gold.withValues(alpha: 0.4),
-                                  ),
-                                ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 18,
+                          left: 18,
+                          right: 18,
+                          height: 46,
+                          child: CustomPaint(
+                            painter: ArchOrnamentPainter(
+                              color: gold.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ),
+                      ],
+                      // Bottom title strip (always — over photo or art)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.55),
+                                Colors.black.withValues(alpha: 0.82),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              book.author,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: gold.withValues(alpha: 0.92),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (_hasStarted && chapterCount > 0)
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(99),
-                                child: LinearProgressIndicator(
-                                  value: _progressRatio,
-                                  minHeight: 3,
-                                  backgroundColor: Colors.white24,
-                                  color: gold,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 28, 12, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  book.title,
+                                  textAlign: TextAlign.center,
+                                  maxLines: _hasCover ? 2 : 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFF6DF),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.3,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black87,
+                                        blurRadius: 6,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                          ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  book.author,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: gold.withValues(alpha: 0.95),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (_hasStarted && chapterCount > 0) ...[
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(99),
+                                    child: LinearProgressIndicator(
+                                      value: _progressRatio,
+                                      minHeight: 3,
+                                      backgroundColor: Colors.white24,
+                                      color: gold,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                       if (onFavoriteToggle != null)
@@ -268,6 +267,35 @@ class BookCoverCard extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FallbackArt extends StatelessWidget {
+  const _FallbackArt({required this.book});
+  final Book book;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            book.color,
+            Color.lerp(book.color, Colors.black, 0.45)!,
+            Color.lerp(book.color, const Color(0xFF0A1A18), 0.65)!,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          book.icon,
+          color: MarefatColors.brassSoft.withValues(alpha: 0.35),
+          size: 42,
         ),
       ),
     );
