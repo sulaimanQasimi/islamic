@@ -20,6 +20,8 @@ Future<void> showBookDetailSheet({
   ValueChanged<Book>? onOpenRelated,
   VoidCallback? onShareText,
   VoidCallback? onSharePdf,
+  VoidCallback? onMarkComplete,
+  bool isCompleted = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -37,6 +39,8 @@ Future<void> showBookDetailSheet({
       onOpenRelated: onOpenRelated,
       onShareText: onShareText,
       onSharePdf: onSharePdf,
+      onMarkComplete: onMarkComplete,
+      isCompleted: isCompleted,
     ),
   );
 }
@@ -54,6 +58,8 @@ class _BookDetailSheet extends StatefulWidget {
     this.onOpenRelated,
     this.onShareText,
     this.onSharePdf,
+    this.onMarkComplete,
+    this.isCompleted = false,
   });
 
   final Book book;
@@ -67,6 +73,8 @@ class _BookDetailSheet extends StatefulWidget {
   final ValueChanged<Book>? onOpenRelated;
   final VoidCallback? onShareText;
   final VoidCallback? onSharePdf;
+  final VoidCallback? onMarkComplete;
+  final bool isCompleted;
 
   @override
   State<_BookDetailSheet> createState() => _BookDetailSheetState();
@@ -307,6 +315,25 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                         ),
                     ],
                   ),
+                if (widget.onMarkComplete != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onMarkComplete!();
+                    },
+                    icon: Icon(
+                      widget.isCompleted
+                          ? Icons.emoji_events_rounded
+                          : Icons.emoji_events_outlined,
+                    ),
+                    label: Text(
+                      widget.isCompleted
+                          ? 'تمام‌شده (ثبت دوباره)'
+                          : 'علامت اتمام کتاب',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [

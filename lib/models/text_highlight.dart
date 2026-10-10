@@ -10,6 +10,7 @@ class TextHighlight {
     required this.text,
     this.colorIndex = 0,
     this.note,
+    this.tags = const [],
     required this.createdAtMs,
   });
 
@@ -18,14 +19,15 @@ class TextHighlight {
   final String text;
   final int colorIndex;
   final String? note;
+  final List<String> tags;
   final int createdAtMs;
 
   static const palette = <Color>[
-    Color(0xFFFFF176), // yellow
-    Color(0xFFA5D6A7), // green
-    Color(0xFF90CAF9), // blue
-    Color(0xFFF48FB1), // pink
-    Color(0xFFFFCC80), // orange
+    Color(0xFFFFF176),
+    Color(0xFFA5D6A7),
+    Color(0xFF90CAF9),
+    Color(0xFFF48FB1),
+    Color(0xFFFFCC80),
   ];
 
   static const paletteLabels = <String>[
@@ -34,6 +36,15 @@ class TextHighlight {
     'آبی',
     'صورتی',
     'نارنجی',
+  ];
+
+  static const suggestedTags = <String>[
+    'اخلاق',
+    'دعا',
+    'حفظ',
+    'تفسیر',
+    'حکمت',
+    'مهم',
   ];
 
   Color get color => palette[colorIndex.clamp(0, palette.length - 1)];
@@ -48,6 +59,7 @@ class TextHighlight {
     int? colorIndex,
     String? note,
     bool clearNote = false,
+    List<String>? tags,
     int? createdAtMs,
   }) {
     return TextHighlight(
@@ -56,6 +68,7 @@ class TextHighlight {
       text: text ?? this.text,
       colorIndex: colorIndex ?? this.colorIndex,
       note: clearNote ? null : (note ?? this.note),
+      tags: tags ?? this.tags,
       createdAtMs: createdAtMs ?? this.createdAtMs,
     );
   }
@@ -66,6 +79,7 @@ class TextHighlight {
         'text': text,
         'colorIndex': colorIndex,
         if (note != null && note!.isNotEmpty) 'note': note,
+        if (tags.isNotEmpty) 'tags': tags,
         'createdAtMs': createdAtMs,
       };
 
@@ -77,12 +91,16 @@ class TextHighlight {
       text: (json['text'] as String? ?? '').trim(),
       colorIndex: (json['colorIndex'] as num?)?.toInt() ?? 0,
       note: json['note'] as String?,
+      tags: (json['tags'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .where((t) => t.trim().isNotEmpty)
+              .toList() ??
+          const [],
       createdAtMs: (json['createdAtMs'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
     );
   }
 
-  /// Legacy storage: `"chapter|selected text"`.
   factory TextHighlight.fromLegacy(String entry) {
     final sep = entry.indexOf('|');
     final chapter = sep > 0 ? (int.tryParse(entry.substring(0, sep)) ?? 0) : 0;

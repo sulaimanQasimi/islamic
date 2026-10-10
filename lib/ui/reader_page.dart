@@ -12,14 +12,18 @@ import '../services/book_cache.dart';
 import '../services/dictionary_service.dart';
 import '../services/epub_parser.dart';
 import '../services/book_pdf_exporter.dart';
+import '../services/completed_books.dart';
+import '../services/cover_metadata.dart';
 import '../services/night_auto.dart';
 import '../services/reading_goals.dart';
 import '../services/reading_history.dart';
 import '../services/share_helper.dart';
+import '../services/user_dictionary.dart';
 import '../theme/marefat_theme.dart';
 import '../widgets/epub_html_view.dart';
 import '../widgets/quote_card_sheet.dart';
 import '../widgets/share_actions_sheet.dart';
+import 'notebook_page.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({super.key, required this.book, required this.backend});
@@ -51,6 +55,14 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   Timer? _focusTimer;
   int _focusRemainingSec = 0;
   bool _focusActive = false;
+  Timer? _sleepTimer;
+  int _sleepRemainingSec = 0;
+  Timer? _autoScrollTimer;
+  double _autoScrollPx = 0; // 0 = off
+  double _blueFilter = 0; // 0..0.5
+  int _chapterSlide = 0; // -1 left, 1 right animation hint
+  String? _opfTitle;
+  String? _opfAuthor;
 
   static const _palettes = <(Color, Color, String)>[
     (Color(0xFFF7F4EC), Color(0xFF28352F), 'کاغذی'),
@@ -91,10 +103,32 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _focusTimer?.cancel();
+    _sleepTimer?.cancel();
+    _autoScrollTimer?.cancel();
     _flushReadingTime();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _scroll.dispose();
     super.dispose();
+  }
+
+  double get _progressRatio {
+    final total = _document?.chapters.length ?? 1;
+    if (total <= 0) return 0;
+    return ((_chapter + 1) / total).clamp(0.0, 1.0);
+  }
+
+  String get _etaLabel {
+    final total = _document?.chapters.length ?? 1;
+    final left = (total - _chapter - 1).clamp(0, total);
+    if (left == 0) return 'پایان نزدیک است';
+    // ~3 minutes per chapter heuristic refined by session pace
+    final secs = _pendingSeconds +
+        (_sessionStarted == null
+            ? 0
+            : DateTime.now().difference(_sessionStarted!).inSeconds);
+    final perChapter = secs > 30 && _chapter > 0 ? secs / _chapter : 180.0;
+    final mins = (left * perChapter / 60).ceil().clamp(1, 999);
+    return '≈ $mins دقیقه باقی‌مانده';
   }
 
   @override
@@ -137,11 +171,16 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         fallbackTitle: widget.book.title,
         fallbackAuthor: widget.book.author,
       );
+      final meta = CoverMetadata.extract(epubBytes);
       await prefs.setInt('chapterCount_${widget.book.id}', doc.chapters.length);
       if (!cached) await BookCache.write(widget.book.id, epubBytes);
+      // Remember last book for quick resume.
+      await prefs.setString('lastOpenedBookId', widget.book.id);
       if (!mounted) return;
       setState(() {
         _document = doc;
+        _opfTitle = meta.title;
+        _opfAuthor = meta.author;
         _isOffline = cached;
         _chapter = (prefs.getInt('progress_${widget.book.id}') ?? 0).clamp(
           0,
@@ -251,7 +290,12 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
 
   void _setChapter(int value) {
     if (_document == null) return;
-    setState(() => _chapter = value.clamp(0, _document!.chapters.length - 1));
+    final next = value.clamp(0, _document!.chapters.length - 1);
+    if (next == _chapter) return;
+    setState(() {
+      _chapterSlide = next > _chapter ? 1 : -1;
+      _chapter = next;
+    });
     _saveProgress();
     ReadingHistory.record(
       bookId: widget.book.id,
@@ -313,6 +357,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     }
 
     var colorIndex = 0;
+    final selectedTags = <String>{};
     final noteController = TextEditingController();
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -333,100 +378,126 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                   22,
                   20 + MediaQuery.viewInsetsOf(context).bottom,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 38,
-                        height: 4,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 38,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.black12,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'برجسته‌سازی متن',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: MarefatColors.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.black12,
-                          borderRadius: BorderRadius.circular(4),
+                          color: TextHighlight.palette[colorIndex]
+                              .withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          selected,
+                          maxLines: 5,
+                          overflow: TextOverflow.ellipsis,
+                          textDirection: _contentDirection,
+                          style: const TextStyle(
+                            height: 1.6,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'برجسته‌سازی متن',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: MarefatColors.ink,
+                      const SizedBox(height: 16),
+                      const Text(
+                        'رنگ',
+                        style: TextStyle(fontWeight: FontWeight.w800),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: TextHighlight.palette[colorIndex]
-                            .withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        selected,
-                        maxLines: 5,
-                        overflow: TextOverflow.ellipsis,
-                        textDirection: _contentDirection,
-                        style: const TextStyle(
-                          height: 1.6,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'رنگ',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        for (var i = 0; i < TextHighlight.palette.length; i++)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 10),
-                            child: GestureDetector(
-                              onTap: () => refresh(() => colorIndex = i),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 160),
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: TextHighlight.palette[i],
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: colorIndex == i
-                                        ? MarefatColors.forest
-                                        : Colors.black26,
-                                    width: colorIndex == i ? 3 : 1,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          for (var i = 0; i < TextHighlight.palette.length; i++)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 10),
+                              child: GestureDetector(
+                                onTap: () => refresh(() => colorIndex = i),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 160),
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: TextHighlight.palette[i],
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: colorIndex == i
+                                          ? MarefatColors.forest
+                                          : Colors.black26,
+                                      width: colorIndex == i ? 3 : 1,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: noteController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'یادداشت (اختیاری)',
-                        border: OutlineInputBorder(),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton.icon(
-                      onPressed: () => Navigator.pop(context, true),
-                      icon: const Icon(Icons.highlight_rounded),
-                      label: const Text('ذخیره برجسته‌سازی'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('لغو'),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      const Text(
+                        'برچسب',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final tag in TextHighlight.suggestedTags)
+                            FilterChip(
+                              label: Text(tag),
+                              selected: selectedTags.contains(tag),
+                              onSelected: (on) => refresh(() {
+                                if (on) {
+                                  selectedTags.add(tag);
+                                } else {
+                                  selectedTags.remove(tag);
+                                }
+                              }),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: noteController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'یادداشت (اختیاری)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton.icon(
+                        onPressed: () => Navigator.pop(context, true),
+                        icon: const Icon(Icons.highlight_rounded),
+                        label: const Text('ذخیره برجسته‌سازی'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('لغو'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -445,6 +516,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       text: selected,
       colorIndex: colorIndex,
       note: note.isEmpty ? null : note,
+      tags: selectedTags.toList(),
       createdAtMs: DateTime.now().millisecondsSinceEpoch,
     );
     setState(() {
@@ -971,6 +1043,69 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                   _shareBookPdf();
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.bedtime_rounded),
+                title: const Text('تایمر خواب'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _startSleepTimer();
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  _autoScrollPx > 0
+                      ? Icons.pause_circle_filled
+                      : Icons.swipe_down_alt_rounded,
+                ),
+                title: Text(
+                  _autoScrollPx > 0 ? 'توقف اسکرول خودکار' : 'اسکرول خودکار',
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _toggleAutoScroll();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.nightlight_round),
+                title: const Text('فیلتر نور آبی'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _cycleBlueFilter();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.format_list_numbered_rounded),
+                title: const Text('پاورقی‌های فصل'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showFootnotes();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.emoji_events_outlined),
+                title: const Text('اتمام کتاب'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _finishBook();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_note_rounded),
+                title: const Text('دفترچه'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openSplitNotebook();
+                },
+              ),
+              if (_selectedText.trim().isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.menu_book_rounded),
+                  title: const Text('افزودن به واژه‌نامه'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _addWordToDictionary();
+                  },
+                ),
               const SizedBox(height: 8),
             ],
           ),
@@ -987,7 +1122,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       );
       return;
     }
-    final meaning = DictionaryService.lookup(word);
+    final meaning = await UserDictionary.lookup(word);
     final suggestions = DictionaryService.suggestions(word);
     if (!mounted) return;
     await showModalBottomSheet<void>(
@@ -1118,6 +1253,233 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     final m = (sec ~/ 60).toString().padLeft(2, '0');
     final s = (sec % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  Future<void> _startSleepTimer() async {
+    final minutes = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: MarefatColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'تایمر خواب',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+            for (final m in [5, 10, 15, 30, 45])
+              ListTile(
+                title: Text('$m دقیقه'),
+                onTap: () => Navigator.pop(context, m),
+              ),
+            if (_sleepRemainingSec > 0)
+              TextButton(
+                onPressed: () => Navigator.pop(context, 0),
+                child: const Text('لغو تایمر'),
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (minutes == null) return;
+    _sleepTimer?.cancel();
+    if (minutes == 0) {
+      setState(() => _sleepRemainingSec = 0);
+      return;
+    }
+    setState(() => _sleepRemainingSec = minutes * 60);
+    _sleepTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (_sleepRemainingSec <= 1) {
+        t.cancel();
+        setState(() => _sleepRemainingSec = 0);
+        Navigator.of(context).maybePop(_chapter);
+        return;
+      }
+      setState(() => _sleepRemainingSec--);
+    });
+  }
+
+  void _toggleAutoScroll() {
+    if (_autoScrollPx > 0) {
+      _autoScrollTimer?.cancel();
+      setState(() => _autoScrollPx = 0);
+      return;
+    }
+    setState(() => _autoScrollPx = 0.6);
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 32), (_) {
+      if (!_scroll.hasClients || _autoScrollPx <= 0) return;
+      final next = (_scroll.offset + _autoScrollPx)
+          .clamp(0.0, _scroll.position.maxScrollExtent);
+      _scroll.jumpTo(next);
+      if (next >= _scroll.position.maxScrollExtent - 1) {
+        _setChapter(_chapter + 1);
+      }
+    });
+  }
+
+  void _cycleBlueFilter() {
+    setState(() {
+      _blueFilter = switch (_blueFilter) {
+        0 => 0.18,
+        < 0.3 => 0.35,
+        _ => 0.0,
+      };
+    });
+  }
+
+  Future<void> _showFootnotes() async {
+    final html = _document?.chapters[_chapter].html ?? '';
+    final notes = <MapEntry<String, String>>[];
+    final re = RegExp(
+      r'''(?:id|name)\s*=\s*["']([^"']*note[^"']*)["'][^>]*>([\s\S]*?)(?:</(?:p|aside|div|li|span)>)''',
+      caseSensitive: false,
+    );
+    for (final m in re.allMatches(html)) {
+      final id = m.group(1) ?? '';
+      final raw = (m.group(2) ?? '')
+          .replaceAll(RegExp(r'<[^>]+>'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (raw.length > 3) notes.add(MapEntry(id, raw));
+    }
+    if (notes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('پاورقی مشخصی در این فصل پیدا نشد.')),
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: MarefatColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.55,
+          builder: (context, controller) => ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                'پاورقی‌های فصل',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              for (final n in notes)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '• ${n.value}',
+                    style: const TextStyle(height: 1.6),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _finishBook() async {
+    final review = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تبریک — پایان کتاب'),
+          content: TextField(
+            controller: review,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'یادداشت پایانی (اختیاری)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('بعداً'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('علامت اتمام'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final text = review.text;
+    review.dispose();
+    if (ok != true) return;
+    await CompletedBooks.markComplete(widget.book.id, review: text);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('کتاب به فهرست تمام‌شده‌ها افزوده شد.')),
+    );
+  }
+
+  void _openSplitNotebook() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NotebookPage(
+          books: [widget.book],
+          onOpenBook: (_) {},
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addWordToDictionary() async {
+    final word = DictionaryService.normalize(_selectedText);
+    if (word.isEmpty) return;
+    final meaning = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('افزودن «$word»'),
+          content: TextField(
+            controller: meaning,
+            decoration: const InputDecoration(
+              labelText: 'معنا',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('لغو'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final m = meaning.text;
+    meaning.dispose();
+    if (ok == true) await UserDictionary.upsert(word, m);
   }
 
   Future<void> _openSettings() async {
@@ -1464,11 +1826,11 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                       child: _ReaderAppBar(
                                         title:
                                             document?.title ?? widget.book.title,
-                                        subtitle: _focusActive
-                                            ? 'تمرکز ${_formatFocus(_focusRemainingSec)}'
-                                            : _isOffline
-                                                ? 'آماده برای مطالعهٔ آفلاین'
-                                                : 'همگام‌سازی شد',
+                                        subtitle: _sleepRemainingSec > 0
+                                            ? 'خواب ${_formatFocus(_sleepRemainingSec)}'
+                                            : _focusActive
+                                                ? 'تمرکز ${_formatFocus(_focusRemainingSec)}'
+                                                : '${(_progressRatio * 100).round()}٪ · $_etaLabel',
                                         foreground: _foreground,
                                         bookmarked:
                                             _bookmarks.contains(_chapter),
@@ -1485,7 +1847,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                     )
                                   : const SizedBox.shrink(),
                             ),
-                            if (_focusActive)
+                            if (_focusActive || _sleepRemainingSec > 0)
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(
@@ -1495,7 +1857,9 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                   alpha: 0.12,
                                 ),
                                 child: Text(
-                                  'تمرکز · ${_formatFocus(_focusRemainingSec)}',
+                                  _sleepRemainingSec > 0
+                                      ? 'خواب · ${_formatFocus(_sleepRemainingSec)}'
+                                      : 'تمرکز · ${_formatFocus(_focusRemainingSec)}',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: _foreground,
@@ -1512,10 +1876,58 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                 alpha: 0.08,
                               ),
                             ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '${(_progressRatio * 100).round()}٪',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: _foreground.withValues(alpha: 0.65),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    _etaLabel,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _foreground.withValues(alpha: 0.55),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             Expanded(
-                              child: GestureDetector(
+                              child: ColorFiltered(
+                                colorFilter: ColorFilter.mode(
+                                  Color.fromRGBO(255, 160, 60, _blueFilter),
+                                  BlendMode.srcATop,
+                                ),
+                                child: GestureDetector(
                                 behavior: HitTestBehavior.translucent,
                                 onTap: _toggleChrome,
+                                onDoubleTap: _toggleBookmark,
+                                onHorizontalDragEnd: (details) {
+                                  final v = details.primaryVelocity ?? 0;
+                                  final rtl = _contentDirection ==
+                                      TextDirection.rtl;
+                                  if (v.abs() < 200) return;
+                                  if (rtl) {
+                                    if (v > 0) {
+                                      _setChapter(_chapter + 1);
+                                    } else {
+                                      _setChapter(_chapter - 1);
+                                    }
+                                  } else {
+                                    if (v < 0) {
+                                      _setChapter(_chapter + 1);
+                                    } else {
+                                      _setChapter(_chapter - 1);
+                                    }
+                                  }
+                                },
                                 child: SelectionArea(
                                   onSelectionChanged: (selection) {
                                     final text = selection?.plainText ?? '';
@@ -1532,46 +1944,87 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                         28,
                                         120,
                                       ),
-                                      child: Directionality(
-                                        textDirection: _contentDirection,
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            Text(
-                                              current!.title,
-                                              textAlign:
-                                                  _contentDirection ==
-                                                          TextDirection.rtl
-                                                      ? TextAlign.right
-                                                      : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                color: MarefatColors.forest,
-                                                fontWeight: FontWeight.w800,
-                                              ),
+                                      child: AnimatedSwitcher(
+                                        duration: const Duration(
+                                          milliseconds: 320,
+                                        ),
+                                        switchInCurve: Curves.easeOutCubic,
+                                        switchOutCurve: Curves.easeInCubic,
+                                        transitionBuilder: (child, anim) {
+                                          final offset = Tween<Offset>(
+                                            begin: Offset(
+                                              _chapterSlide >= 0 ? 0.08 : -0.08,
+                                              0,
                                             ),
-                                            const SizedBox(height: 22),
-                                            EpubHtmlView(
-                                              html: current.html.isNotEmpty
-                                                  ? current.html
-                                                  : '<p>${_escapeHtml(current.body)}</p>',
-                                              style: TextStyle(
-                                                fontSize: _fontSize,
-                                                height: _lineHeight,
-                                                color: _foreground,
-                                              ),
-                                              textAlign: _bodyAlign,
-                                              textDirection: _contentDirection,
-                                              highlights: _chapterHighlights,
-                                              darkHighlights: _theme == 2,
+                                            end: Offset.zero,
+                                          ).animate(anim);
+                                          return FadeTransition(
+                                            opacity: anim,
+                                            child: SlideTransition(
+                                              position: offset,
+                                              child: child,
                                             ),
-                                          ],
+                                          );
+                                        },
+                                        child: Directionality(
+                                          key: ValueKey('ch_$_chapter'),
+                                          textDirection: _contentDirection,
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Text(
+                                                current!.title,
+                                                textAlign:
+                                                    _contentDirection ==
+                                                            TextDirection.rtl
+                                                        ? TextAlign.right
+                                                        : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: MarefatColors.forest,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                              if (_opfTitle != null &&
+                                                  _opfTitle !=
+                                                      widget.book.title) ...[
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  'شناسهٔ جلد: $_opfTitle'
+                                                  '${_opfAuthor == null ? '' : ' · $_opfAuthor'}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: _foreground
+                                                        .withValues(alpha: 0.5),
+                                                  ),
+                                                ),
+                                              ],
+                                              const SizedBox(height: 22),
+                                              EpubHtmlView(
+                                                html: current.html.isNotEmpty
+                                                    ? current.html
+                                                    : '<p>${_escapeHtml(current.body)}</p>',
+                                                style: TextStyle(
+                                                  fontSize: _fontSize,
+                                                  height: _lineHeight,
+                                                  color: _foreground,
+                                                ),
+                                                textAlign: _bodyAlign,
+                                                textDirection:
+                                                    _contentDirection,
+                                                highlights:
+                                                    _chapterHighlights,
+                                                darkHighlights: _theme == 2,
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
+                              ),
                               ),
                             ),
                           ],

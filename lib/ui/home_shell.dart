@@ -9,8 +9,10 @@ import '../services/app_storage.dart';
 import '../services/book_backend.dart';
 import '../services/book_cache.dart';
 import '../services/book_pdf_exporter.dart';
+import '../services/completed_books.dart';
 import '../services/epub_parser.dart';
 import '../services/night_auto.dart';
+import '../services/prefetch_service.dart';
 import '../services/reading_goals.dart';
 import '../services/share_helper.dart';
 import '../services/study_reminder.dart';
@@ -25,6 +27,7 @@ import 'collections_page.dart';
 import 'history_page.dart';
 import 'notebook_page.dart';
 import 'reader_page.dart';
+import 'tools_hub_page.dart';
 
 enum LibrarySort { title, author, progress, featured }
 
@@ -61,6 +64,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   bool _reminderOn = false;
   int _reminderHour = 20;
   int _reminderMinute = 0;
+  bool _launchLastBook = false;
+  Set<String> _completed = {};
+  bool _didAutoResume = false;
 
   @override
   void initState() {
@@ -91,6 +97,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final window = await NightAuto.window();
     final rem = await StudyReminder.enabled();
     final remTime = await StudyReminder.time();
+    final prefs = await AppStorage.getInstance();
+    final completed = await CompletedBooks.load();
     if (!mounted) return;
     setState(() {
       _goalToday = snap.today;
@@ -102,6 +110,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       _reminderOn = rem;
       _reminderHour = remTime.$1;
       _reminderMinute = remTime.$2;
+      _launchLastBook = prefs.getBool('launchLastBook') ?? false;
+      _completed = completed.keys.toSet();
     });
     MarefatAppScope.of(context)?.onNightScheduleChanged?.call();
     await _maybeShowReminder();
@@ -176,6 +186,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         _loading = false;
       });
       _loadCovers(books);
+      _afterCatalogReady(books);
     } catch (e) {
       if (!mounted) return;
       final prefs = await AppStorage.getInstance();
@@ -194,6 +205,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             _error = null;
           });
           _loadCovers(books);
+          _afterCatalogReady(books);
           return;
         } catch (restoreError) {
           debugPrint('Could not restore cached catalog: $restoreError');
@@ -233,6 +245,90 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         debugPrint('Cover extract failed for ${book.id}: $error');
       }
     }
+  }
+
+  Future<void> _afterCatalogReady(List<Book> books) async {
+    final continueIds = books
+        .where((b) => (_progress[b.id] ?? 0) > 0)
+        .take(4)
+        .toList();
+    PrefetchService.prefetchBooks(
+      backend: _backend,
+      books: continueIds,
+    );
+    final prefs = await AppStorage.getInstance();
+    if (_didAutoResume) return;
+    if (!(prefs.getBool('launchLastBook') ?? false)) return;
+    final lastId = prefs.getString('lastOpenedBookId');
+    if (lastId == null || lastId.isEmpty) return;
+    Book? book;
+    try {
+      book = books.firstWhere((b) => b.id == lastId);
+    } catch (_) {}
+    if (book != null && mounted) {
+      _didAutoResume = true;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (mounted) await _open(book);
+    }
+  }
+
+  Future<void> _openTools() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ToolsHubPage(
+          books: _books,
+          backend: _backend,
+          onOpenBook: _open,
+          onOpenBookChapter: (book, chapter) async {
+            final prefs = await AppStorage.getInstance();
+            await prefs.setInt('progress_${book.id}', chapter);
+            if (!mounted) return;
+            await _open(book);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _finishBookFromDetail(Book book) async {
+    final review = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('اتمام «${book.title}»؟'),
+          content: TextField(
+            controller: review,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'یادداشت پایانی',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('لغو'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('تمام شد'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final text = review.text;
+    review.dispose();
+    if (ok != true) return;
+    await CompletedBooks.markComplete(book.id, review: text);
+    await _loadExtras();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('کتاب علامت اتمام خورد.')),
+    );
   }
 
   void _applyPrefs(AppStorage prefs, List<Book> books) {
@@ -376,6 +472,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       onOpenRelated: _showDetail,
       onShareText: () => _shareBookText(book),
       onSharePdf: () => _shareBookPdf(book),
+      onMarkComplete: () => _finishBookFromDetail(book),
+      isCompleted: _completed.contains(book.id),
     );
     if (mounted) setState(() {});
   }
@@ -561,6 +659,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                             onHistory: _openHistory,
                             onNotebook: _openNotebook,
                             onCollections: _openCollections,
+                            onTools: _openTools,
                           ),
                           _SearchTab(
                             controller: _search,
@@ -621,6 +720,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                             onHistory: _openHistory,
                             onNotebook: _openNotebook,
                             onCollections: _openCollections,
+                            launchLastBook: _launchLastBook,
+                            onLaunchLastBook: (v) async {
+                              final prefs = await AppStorage.getInstance();
+                              await prefs.setBool('launchLastBook', v);
+                              setState(() => _launchLastBook = v);
+                            },
+                            onTools: _openTools,
                           ),
                         ],
                       ),
@@ -747,6 +853,7 @@ class _LibraryTab extends StatelessWidget {
     required this.onHistory,
     required this.onNotebook,
     required this.onCollections,
+    required this.onTools,
   });
 
   final List<Book> books;
@@ -777,6 +884,7 @@ class _LibraryTab extends StatelessWidget {
   final VoidCallback onHistory;
   final VoidCallback onNotebook;
   final VoidCallback onCollections;
+  final VoidCallback onTools;
 
   @override
   Widget build(BuildContext context) {
@@ -808,6 +916,7 @@ class _LibraryTab extends StatelessWidget {
               onHistory: onHistory,
               onNotebook: onNotebook,
               onCollections: onCollections,
+              onTools: onTools,
             ),
           ),
           SliverToBoxAdapter(
@@ -990,11 +1099,13 @@ class _QuickToolsRow extends StatelessWidget {
     required this.onHistory,
     required this.onNotebook,
     required this.onCollections,
+    required this.onTools,
   });
 
   final VoidCallback onHistory;
   final VoidCallback onNotebook;
   final VoidCallback onCollections;
+  final VoidCallback onTools;
 
   @override
   Widget build(BuildContext context) {
@@ -1008,7 +1119,7 @@ class _QuickToolsRow extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Ink(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
               color: MarefatColors.mist.withValues(alpha: 0.75),
               borderRadius: BorderRadius.circular(16),
@@ -1016,12 +1127,12 @@ class _QuickToolsRow extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Icon(icon, color: MarefatColors.forest, size: 22),
-                const SizedBox(height: 6),
+                Icon(icon, color: MarefatColors.forest, size: 20),
+                const SizedBox(height: 4),
                 Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1041,17 +1152,23 @@ class _QuickToolsRow extends StatelessWidget {
             label: 'تاریخچه',
             onTap: onHistory,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           chip(
             icon: Icons.edit_note_rounded,
             label: 'دفترچه',
             onTap: onNotebook,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           chip(
             icon: Icons.folder_special_rounded,
             label: 'قفسه‌ها',
             onTap: onCollections,
+          ),
+          const SizedBox(width: 6),
+          chip(
+            icon: Icons.apps_rounded,
+            label: 'ابزارها',
+            onTap: onTools,
           ),
         ],
       ),
@@ -1864,6 +1981,9 @@ class _SettingsTab extends StatelessWidget {
     required this.onHistory,
     required this.onNotebook,
     required this.onCollections,
+    required this.launchLastBook,
+    required this.onLaunchLastBook,
+    required this.onTools,
   });
 
   final ThemeMode themeMode;
@@ -1877,6 +1997,7 @@ class _SettingsTab extends StatelessWidget {
   final bool reminderOn;
   final int reminderHour;
   final int reminderMinute;
+  final bool launchLastBook;
   final ValueChanged<ThemeMode> onThemeMode;
   final Future<void> Function() onRefresh;
   final VoidCallback onEditGoal;
@@ -1884,9 +2005,11 @@ class _SettingsTab extends StatelessWidget {
   final void Function(int start, int end) onNightWindow;
   final ValueChanged<bool> onReminder;
   final void Function(int hour, int minute) onReminderTime;
+  final ValueChanged<bool> onLaunchLastBook;
   final VoidCallback onHistory;
   final VoidCallback onNotebook;
   final VoidCallback onCollections;
+  final VoidCallback onTools;
 
   String _hh(int h, int m) =>
       '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
@@ -2036,6 +2159,17 @@ class _SettingsTab extends StatelessWidget {
                     }
                   },
                 ),
+              const Divider(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'ادامه از آخرین کتاب',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: const Text('با باز شدن برنامه، آخرین کتاب باز شود'),
+                value: launchLastBook,
+                onChanged: onLaunchLastBook,
+              ),
             ],
           ),
         ),
@@ -2043,6 +2177,13 @@ class _SettingsTab extends StatelessWidget {
         _SettingsCard(
           child: Column(
             children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.apps_rounded),
+                title: const Text('همهٔ ابزارها'),
+                onTap: onTools,
+              ),
+              const Divider(height: 8),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.history_rounded),
