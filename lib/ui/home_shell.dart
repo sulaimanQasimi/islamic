@@ -9,11 +9,18 @@ import '../services/app_storage.dart';
 import '../services/book_backend.dart';
 import '../services/book_cache.dart';
 import '../services/epub_parser.dart';
+import '../services/night_auto.dart';
+import '../services/reading_goals.dart';
+import '../services/study_reminder.dart';
 import '../theme/marefat_theme.dart';
 import '../widgets/book_cover_card.dart';
 import '../widgets/book_detail_sheet.dart';
+import '../widgets/goal_progress_card.dart';
 import '../widgets/marefat_backdrop.dart';
 import '../widgets/shimmer_library.dart';
+import 'collections_page.dart';
+import 'history_page.dart';
+import 'notebook_page.dart';
 import 'reader_page.dart';
 
 enum LibrarySort { title, author, progress, featured }
@@ -26,7 +33,7 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late final BookBackend _backend;
   final _search = TextEditingController();
   List<Book> _books = [];
@@ -42,18 +49,108 @@ class _HomeShellState extends State<HomeShell> {
   bool _gridView = true;
   String? _error;
   ThemeMode _themeMode = ThemeMode.system;
+  int _goalToday = 0;
+  int _goalTarget = ReadingGoals.defaultGoalMinutes;
+  int _streak = 0;
+  bool _nightAuto = false;
+  int _nightStart = 19;
+  int _nightEnd = 6;
+  bool _reminderOn = false;
+  int _reminderHour = 20;
+  int _reminderMinute = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _backend = widget.backend ?? BookBackend();
     _loadCatalog();
+    _loadExtras();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _search.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadExtras();
+    }
+  }
+
+  Future<void> _loadExtras() async {
+    final snap = await ReadingGoals.snapshot();
+    final night = await NightAuto.enabled();
+    final window = await NightAuto.window();
+    final rem = await StudyReminder.enabled();
+    final remTime = await StudyReminder.time();
+    if (!mounted) return;
+    setState(() {
+      _goalToday = snap.today;
+      _goalTarget = snap.goal;
+      _streak = snap.streak;
+      _nightAuto = night;
+      _nightStart = window.$1;
+      _nightEnd = window.$2;
+      _reminderOn = rem;
+      _reminderHour = remTime.$1;
+      _reminderMinute = remTime.$2;
+    });
+    MarefatAppScope.of(context)?.onNightScheduleChanged?.call();
+    await _maybeShowReminder();
+  }
+
+  Future<void> _maybeShowReminder() async {
+    if (!await StudyReminder.shouldNudge()) return;
+    if (!mounted) return;
+    await StudyReminder.markShown();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('یادآور مطالعه'),
+          content: const Text(
+            'وقت مطالعه رسیده است. چند دقیقه با معرفت همراه باشید.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('بعداً'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                if (_continueReading.isNotEmpty) {
+                  _open(_continueReading.first);
+                } else if (_books.isNotEmpty) {
+                  _open(_books.first);
+                }
+              },
+              child: const Text('شروع مطالعه'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Book> _relatedFor(Book book) {
+    final scored = <(Book, int)>[];
+    for (final b in _books) {
+      if (b.id == book.id) continue;
+      var score = 0;
+      if (b.category == book.category) score += 2;
+      if (b.author == book.author) score += 3;
+      if (score > 0) scored.add((b, score));
+    }
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+    return scored.take(6).map((e) => e.$1).toList();
   }
 
   Future<void> _loadCatalog() async {
@@ -250,14 +347,16 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ),
     );
-    if (result != null && mounted) {
-      final updatedPrefs = await AppStorage.getInstance();
-      setState(() {
+    if (!mounted) return;
+    final updatedPrefs = await AppStorage.getInstance();
+    setState(() {
+      if (result != null) {
         _progress[book.id] = result;
         _chapterCounts[book.id] =
             updatedPrefs.getInt('chapterCount_${book.id}') ?? 1;
-      });
-    }
+      }
+    });
+    await _loadExtras();
   }
 
   Future<void> _showDetail(Book book) async {
@@ -270,8 +369,79 @@ class _HomeShellState extends State<HomeShell> {
       isFavorite: _favorites.contains(book.id),
       onToggleFavorite: () => _toggleFavorite(book.id),
       onOpen: () => _open(book),
+      related: _relatedFor(book),
+      onOpenRelated: _showDetail,
     );
     if (mounted) setState(() {});
+  }
+
+  Future<void> _openHistory() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HistoryPage(books: _books, onOpenBook: _open),
+      ),
+    );
+  }
+
+  Future<void> _openNotebook() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NotebookPage(books: _books, onOpenBook: _open),
+      ),
+    );
+  }
+
+  Future<void> _openCollections() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CollectionsPage(books: _books, onOpenBook: _open),
+      ),
+    );
+  }
+
+  Future<void> _editGoal() async {
+    var minutes = _goalTarget;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: StatefulBuilder(
+          builder: (context, refresh) => AlertDialog(
+            title: const Text('هدف روزانه'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$minutes دقیقه'),
+                Slider(
+                  value: minutes.toDouble(),
+                  min: 5,
+                  max: 120,
+                  divisions: 23,
+                  label: '$minutes',
+                  onChanged: (v) => refresh(() => minutes = v.round()),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('لغو'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('ذخیره'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok != true) return;
+    await ReadingGoals.setGoalMinutes(minutes);
+    await _loadExtras();
   }
 
   @override
@@ -307,6 +477,9 @@ class _HomeShellState extends State<HomeShell> {
                             catalogOffline: _catalogOffline,
                             startedCount: _startedCount,
                             favoriteCount: _favorites.length,
+                            goalToday: _goalToday,
+                            goalTarget: _goalTarget,
+                            streak: _streak,
                             onRefresh: _loadCatalog,
                             onCategory: (v) => setState(() => _category = v),
                             onSort: (v) => setState(() => _sort = v),
@@ -314,6 +487,10 @@ class _HomeShellState extends State<HomeShell> {
                             onOpen: _open,
                             onDetail: _showDetail,
                             onFavorite: _toggleFavorite,
+                            onGoalTap: _editGoal,
+                            onHistory: _openHistory,
+                            onNotebook: _openNotebook,
+                            onCollections: _openCollections,
                           ),
                           _SearchTab(
                             controller: _search,
@@ -342,8 +519,38 @@ class _HomeShellState extends State<HomeShell> {
                             bookCount: _books.length,
                             startedCount: _startedCount,
                             favoriteCount: _favorites.length,
+                            goalMinutes: _goalTarget,
+                            nightAuto: _nightAuto,
+                            nightStart: _nightStart,
+                            nightEnd: _nightEnd,
+                            reminderOn: _reminderOn,
+                            reminderHour: _reminderHour,
+                            reminderMinute: _reminderMinute,
                             onThemeMode: _setThemeMode,
                             onRefresh: _loadCatalog,
+                            onEditGoal: _editGoal,
+                            onNightAuto: (v) async {
+                              await NightAuto.setEnabled(v);
+                              await _loadExtras();
+                            },
+                            onNightWindow: (start, end) async {
+                              await NightAuto.setWindow(
+                                startHour: start,
+                                endHour: end,
+                              );
+                              await _loadExtras();
+                            },
+                            onReminder: (v) async {
+                              await StudyReminder.setEnabled(v);
+                              await _loadExtras();
+                            },
+                            onReminderTime: (h, m) async {
+                              await StudyReminder.setTime(hour: h, minute: m);
+                              await _loadExtras();
+                            },
+                            onHistory: _openHistory,
+                            onNotebook: _openNotebook,
+                            onCollections: _openCollections,
                           ),
                         ],
                       ),
@@ -424,11 +631,13 @@ class MarefatAppScope extends InheritedWidget {
     super.key,
     required this.themeMode,
     required this.onThemeModeChanged,
+    this.onNightScheduleChanged,
     required super.child,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+  final Future<void> Function()? onNightScheduleChanged;
 
   static MarefatAppScope? of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<MarefatAppScope>();
@@ -454,6 +663,9 @@ class _LibraryTab extends StatelessWidget {
     required this.catalogOffline,
     required this.startedCount,
     required this.favoriteCount,
+    required this.goalToday,
+    required this.goalTarget,
+    required this.streak,
     required this.onRefresh,
     required this.onCategory,
     required this.onSort,
@@ -461,6 +673,10 @@ class _LibraryTab extends StatelessWidget {
     required this.onOpen,
     required this.onDetail,
     required this.onFavorite,
+    required this.onGoalTap,
+    required this.onHistory,
+    required this.onNotebook,
+    required this.onCollections,
   });
 
   final List<Book> books;
@@ -477,6 +693,9 @@ class _LibraryTab extends StatelessWidget {
   final bool catalogOffline;
   final int startedCount;
   final int favoriteCount;
+  final int goalToday;
+  final int goalTarget;
+  final int streak;
   final Future<void> Function() onRefresh;
   final ValueChanged<String> onCategory;
   final ValueChanged<LibrarySort> onSort;
@@ -484,6 +703,10 @@ class _LibraryTab extends StatelessWidget {
   final ValueChanged<Book> onOpen;
   final ValueChanged<Book> onDetail;
   final ValueChanged<String> onFavorite;
+  final VoidCallback onGoalTap;
+  final VoidCallback onHistory;
+  final VoidCallback onNotebook;
+  final VoidCallback onCollections;
 
   @override
   Widget build(BuildContext context) {
@@ -502,6 +725,21 @@ class _LibraryTab extends StatelessWidget {
             SliverToBoxAdapter(
               child: _OfflineBanner(),
             ),
+          SliverToBoxAdapter(
+            child: GoalProgressCard(
+              todayMinutes: goalToday,
+              goalMinutes: goalTarget,
+              streak: streak,
+              onTap: onGoalTap,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _QuickToolsRow(
+              onHistory: onHistory,
+              onNotebook: onNotebook,
+              onCollections: onCollections,
+            ),
+          ),
           SliverToBoxAdapter(
             child: _StatsRow(
               bookCount: allBooks.length,
@@ -670,6 +908,80 @@ class _BrandHeader extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickToolsRow extends StatelessWidget {
+  const _QuickToolsRow({
+    required this.onHistory,
+    required this.onNotebook,
+    required this.onCollections,
+  });
+
+  final VoidCallback onHistory;
+  final VoidCallback onNotebook;
+  final VoidCallback onCollections;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip({
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+    }) {
+      return Expanded(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: MarefatColors.mist.withValues(alpha: 0.75),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: MarefatColors.mistDeep),
+            ),
+            child: Column(
+              children: [
+                Icon(icon, color: MarefatColors.forest, size: 22),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Row(
+        children: [
+          chip(
+            icon: Icons.history_rounded,
+            label: 'تاریخچه',
+            onTap: onHistory,
+          ),
+          const SizedBox(width: 8),
+          chip(
+            icon: Icons.edit_note_rounded,
+            label: 'دفترچه',
+            onTap: onNotebook,
+          ),
+          const SizedBox(width: 8),
+          chip(
+            icon: Icons.folder_special_rounded,
+            label: 'قفسه‌ها',
+            onTap: onCollections,
           ),
         ],
       ),
@@ -1465,16 +1777,49 @@ class _SettingsTab extends StatelessWidget {
     required this.bookCount,
     required this.startedCount,
     required this.favoriteCount,
+    required this.goalMinutes,
+    required this.nightAuto,
+    required this.nightStart,
+    required this.nightEnd,
+    required this.reminderOn,
+    required this.reminderHour,
+    required this.reminderMinute,
     required this.onThemeMode,
     required this.onRefresh,
+    required this.onEditGoal,
+    required this.onNightAuto,
+    required this.onNightWindow,
+    required this.onReminder,
+    required this.onReminderTime,
+    required this.onHistory,
+    required this.onNotebook,
+    required this.onCollections,
   });
 
   final ThemeMode themeMode;
   final int bookCount;
   final int startedCount;
   final int favoriteCount;
+  final int goalMinutes;
+  final bool nightAuto;
+  final int nightStart;
+  final int nightEnd;
+  final bool reminderOn;
+  final int reminderHour;
+  final int reminderMinute;
   final ValueChanged<ThemeMode> onThemeMode;
   final Future<void> Function() onRefresh;
+  final VoidCallback onEditGoal;
+  final ValueChanged<bool> onNightAuto;
+  final void Function(int start, int end) onNightWindow;
+  final ValueChanged<bool> onReminder;
+  final void Function(int hour, int minute) onReminderTime;
+  final VoidCallback onHistory;
+  final VoidCallback onNotebook;
+  final VoidCallback onCollections;
+
+  String _hh(int h, int m) =>
+      '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -1490,7 +1835,7 @@ class _SettingsTab extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'ظاهر برنامه و همگام‌سازی فهرست',
+          'ظاهر، هدف مطالعه و یادآورها',
           style: theme.textTheme.bodyMedium?.copyWith(color: MarefatColors.muted),
         ),
         const SizedBox(height: 22),
@@ -1523,6 +1868,130 @@ class _SettingsTab extends StatelessWidget {
                 ],
                 selected: {themeMode},
                 onSelectionChanged: (value) => onThemeMode(value.first),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SettingsCard(
+          child: Column(
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'شب خودکار',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text(
+                  'از ساعت $nightStart تا $nightEnd پوسته تیره می‌شود',
+                ),
+                value: nightAuto,
+                onChanged: onNightAuto,
+              ),
+              if (nightAuto) ...[
+                const Divider(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('شروع شب'),
+                  trailing: Text('$nightStart:00'),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay(hour: nightStart, minute: 0),
+                    );
+                    if (picked != null) {
+                      onNightWindow(picked.hour, nightEnd);
+                    }
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('پایان شب'),
+                  trailing: Text('$nightEnd:00'),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay(hour: nightEnd, minute: 0),
+                    );
+                    if (picked != null) {
+                      onNightWindow(nightStart, picked.hour);
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SettingsCard(
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.flag_rounded, color: MarefatColors.forest),
+                title: const Text(
+                  'هدف روزانه',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text('$goalMinutes دقیقه'),
+                trailing: const Icon(Icons.chevron_left_rounded),
+                onTap: onEditGoal,
+              ),
+              const Divider(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'یادآور مطالعه',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text('ساعت ${_hh(reminderHour, reminderMinute)}'),
+                value: reminderOn,
+                onChanged: onReminder,
+              ),
+              if (reminderOn)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('زمان یادآور'),
+                  trailing: Text(_hh(reminderHour, reminderMinute)),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay(
+                        hour: reminderHour,
+                        minute: reminderMinute,
+                      ),
+                    );
+                    if (picked != null) {
+                      onReminderTime(picked.hour, picked.minute);
+                    }
+                  },
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SettingsCard(
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.history_rounded),
+                title: const Text('تاریخچهٔ مطالعه'),
+                onTap: onHistory,
+              ),
+              const Divider(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.edit_note_rounded),
+                title: const Text('دفترچهٔ یادداشت'),
+                onTap: onNotebook,
+              ),
+              const Divider(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.folder_special_rounded),
+                title: const Text('قفسه‌ها'),
+                onTap: onCollections,
               ),
             ],
           ),

@@ -1,14 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../models/book.dart';
+import '../models/text_highlight.dart';
 import '../services/app_storage.dart';
 import '../services/book_backend.dart';
 import '../services/book_cache.dart';
+import '../services/dictionary_service.dart';
 import '../services/epub_parser.dart';
+import '../services/night_auto.dart';
+import '../services/reading_goals.dart';
+import '../services/reading_history.dart';
 import '../theme/marefat_theme.dart';
 import '../widgets/epub_html_view.dart';
+import '../widgets/quote_card_sheet.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({super.key, required this.book, required this.backend});
@@ -19,7 +27,7 @@ class ReaderPage extends StatefulWidget {
   State<ReaderPage> createState() => _ReaderPageState();
 }
 
-class _ReaderPageState extends State<ReaderPage> {
+class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   EpubDocument? _document;
   String? _error;
   bool _loading = true;
@@ -32,8 +40,14 @@ class _ReaderPageState extends State<ReaderPage> {
   String _align = 'justify';
   String _selectedText = '';
   final Set<int> _bookmarks = {};
-  final Set<String> _highlights = {};
+  final List<TextHighlight> _highlights = [];
   final _scroll = ScrollController();
+
+  DateTime? _sessionStarted;
+  int _pendingSeconds = 0;
+  Timer? _focusTimer;
+  int _focusRemainingSec = 0;
+  bool _focusActive = false;
 
   static const _palettes = <(Color, Color, String)>[
     (Color(0xFFF7F4EC), Color(0xFF28352F), 'کاغذی'),
@@ -52,15 +66,8 @@ class _ReaderPageState extends State<ReaderPage> {
   Color get _foreground => _palettes[_theme].$2;
   TextDirection get _contentDirection => widget.book.textDirection;
 
-  List<String> get _chapterHighlights => _highlights
-      .map((entry) {
-        final sep = entry.indexOf('|');
-        if (sep < 0) return entry;
-        final chapter = int.tryParse(entry.substring(0, sep));
-        return chapter == _chapter ? entry.substring(sep + 1) : null;
-      })
-      .whereType<String>()
-      .toList();
+  List<TextHighlight> get _chapterHighlights =>
+      _highlights.where((h) => h.chapter == _chapter).toList();
 
   TextAlign get _bodyAlign => switch (_align) {
     'left' => TextAlign.left,
@@ -72,14 +79,47 @@ class _ReaderPageState extends State<ReaderPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _sessionStarted = DateTime.now();
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _focusTimer?.cancel();
+    _flushReadingTime();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _scroll.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _pauseSessionClock();
+    } else if (state == AppLifecycleState.resumed) {
+      _sessionStarted = DateTime.now();
+    }
+  }
+
+  void _pauseSessionClock() {
+    final started = _sessionStarted;
+    if (started == null) return;
+    _pendingSeconds += DateTime.now().difference(started).inSeconds;
+    _sessionStarted = null;
+  }
+
+  Future<void> _flushReadingTime() async {
+    _pauseSessionClock();
+    if (_pendingSeconds < 15) {
+      _pendingSeconds = 0;
+      return;
+    }
+    final secs = _pendingSeconds;
+    _pendingSeconds = 0;
+    await ReadingGoals.addSeconds(secs);
   }
 
   Future<void> _load() async {
@@ -115,11 +155,28 @@ class _ReaderPageState extends State<ReaderPage> {
           prefs.getStringList('bookmarks_${widget.book.id}')?.map(int.parse) ??
               [],
         );
-        _highlights.addAll(
-          prefs.getStringList('highlights_${widget.book.id}') ?? [],
-        );
+        _highlights
+          ..clear()
+          ..addAll(_loadHighlights(prefs));
         _loading = false;
       });
+      if (await NightAuto.isNightNow()) {
+        if (mounted) {
+          setState(() => _theme = NightAuto.readerNightThemeIndex);
+        }
+      }
+      // Persist migrated legacy highlights once.
+      if (_highlights.isNotEmpty &&
+          (prefs.getString('highlights_json_${widget.book.id}') == null ||
+              prefs.getString('highlights_json_${widget.book.id}')!.isEmpty)) {
+        await _saveNotes();
+      }
+      await ReadingHistory.record(
+        bookId: widget.book.id,
+        title: widget.book.title,
+        author: widget.book.author,
+        chapter: _chapter,
+      );
       if (!cached && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('کتاب برای مطالعهٔ آفلاین آماده شد.')),
@@ -143,15 +200,28 @@ class _ReaderPageState extends State<ReaderPage> {
     }
   }
 
+  List<TextHighlight> _loadHighlights(AppStorage prefs) {
+    final jsonKey = 'highlights_json_${widget.book.id}';
+    final fromJson = TextHighlight.decodeList(prefs.getString(jsonKey));
+    if (fromJson.isNotEmpty) return fromJson;
+
+    final legacy = prefs.getStringList('highlights_${widget.book.id}') ?? [];
+    if (legacy.isEmpty) return const [];
+    return [
+      for (final entry in legacy)
+        if (entry.trim().isNotEmpty) TextHighlight.fromLegacy(entry),
+    ];
+  }
+
   Future<void> _saveNotes() async {
     final prefs = await AppStorage.getInstance();
     await prefs.setStringList(
       'bookmarks_${widget.book.id}',
       _bookmarks.map((n) => n.toString()).toList(),
     );
-    await prefs.setStringList(
-      'highlights_${widget.book.id}',
-      _highlights.toList(),
+    await prefs.setString(
+      'highlights_json_${widget.book.id}',
+      TextHighlight.encodeList(_highlights),
     );
   }
 
@@ -180,6 +250,12 @@ class _ReaderPageState extends State<ReaderPage> {
     if (_document == null) return;
     setState(() => _chapter = value.clamp(0, _document!.chapters.length - 1));
     _saveProgress();
+    ReadingHistory.record(
+      bookId: widget.book.id,
+      title: widget.book.title,
+      author: widget.book.author,
+      chapter: _chapter,
+    );
     if (_scroll.hasClients) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scroll.hasClients) _scroll.jumpTo(0);
@@ -206,8 +282,9 @@ class _ReaderPageState extends State<ReaderPage> {
     );
   }
 
-  void _addHighlight() {
-    if (_selectedText.trim().isEmpty) {
+  Future<void> _addHighlight() async {
+    final selected = _selectedText.trim();
+    if (selected.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('برای برجسته‌سازی، بخشی از متن را انتخاب کنید.'),
@@ -215,11 +292,684 @@ class _ReaderPageState extends State<ReaderPage> {
       );
       return;
     }
-    setState(() => _highlights.add('$_chapter|${_selectedText.trim()}'));
-    _saveNotes();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('یادداشت به برجسته‌شده‌ها افزوده شد.')),
+    if (selected.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('متن انتخاب‌شده خیلی کوتاه است.')),
+      );
+      return;
+    }
+
+    final existing = _highlights.where(
+      (h) => h.chapter == _chapter && h.text == selected,
     );
+    if (existing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('این متن قبلاً برجسته شده است.')),
+      );
+      return;
+    }
+
+    var colorIndex = 0;
+    final noteController = TextEditingController();
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: MarefatColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, refresh) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  22,
+                  14,
+                  22,
+                  20 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.black12,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'برجسته‌سازی متن',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: MarefatColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: TextHighlight.palette[colorIndex]
+                            .withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        selected,
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis,
+                        textDirection: _contentDirection,
+                        style: const TextStyle(
+                          height: 1.6,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'رنگ',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        for (var i = 0; i < TextHighlight.palette.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 10),
+                            child: GestureDetector(
+                              onTap: () => refresh(() => colorIndex = i),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: TextHighlight.palette[i],
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: colorIndex == i
+                                        ? MarefatColors.forest
+                                        : Colors.black26,
+                                    width: colorIndex == i ? 3 : 1,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: noteController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'یادداشت (اختیاری)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.highlight_rounded),
+                      label: const Text('ذخیره برجسته‌سازی'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('لغو'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    final note = noteController.text.trim();
+    noteController.dispose();
+    if (confirmed != true || !mounted) return;
+
+    final highlight = TextHighlight(
+      id: 'h_${DateTime.now().microsecondsSinceEpoch}',
+      chapter: _chapter,
+      text: selected,
+      colorIndex: colorIndex,
+      note: note.isEmpty ? null : note,
+      createdAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    setState(() {
+      _highlights.insert(0, highlight);
+      _selectedText = '';
+    });
+    await _saveNotes();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('متن برجسته و ذخیره شد.')),
+    );
+  }
+
+  Future<void> _removeHighlight(TextHighlight highlight) async {
+    setState(() => _highlights.removeWhere((h) => h.id == highlight.id));
+    await _saveNotes();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('برجسته‌سازی حذف شد.')),
+    );
+  }
+
+  Future<void> _updateHighlight(TextHighlight updated) async {
+    final index = _highlights.indexWhere((h) => h.id == updated.id);
+    if (index < 0) return;
+    setState(() => _highlights[index] = updated);
+    await _saveNotes();
+  }
+
+  Future<void> _showHighlights() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: MarefatColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, refresh) {
+            final items = [..._highlights]
+              ..sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.62,
+                minChildSize: 0.4,
+                maxChildSize: 0.92,
+                builder: (context, controller) {
+                  return SafeArea(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        Container(
+                          width: 38,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.black12,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'برجسته‌شده‌ها',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: MarefatColors.ink,
+                                  ),
+                                ),
+                              ),
+                              if (items.isNotEmpty)
+                                IconButton(
+                                  tooltip: 'خروجی',
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    _exportHighlights();
+                                  },
+                                  icon: const Icon(Icons.ios_share_rounded),
+                                ),
+                              Text(
+                                '${items.length}',
+                                style: TextStyle(
+                                  color: MarefatColors.forest.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: items.isEmpty
+                              ? const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(28),
+                                    child: Text(
+                                      'هنوز متنی برجسته نکرده‌اید.\nمتن را انتخاب کنید و دکمه برجسته‌سازی را بزنید.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        height: 1.7,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  controller: controller,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    4,
+                                    16,
+                                    24,
+                                  ),
+                                  itemCount: items.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    final item = items[index];
+                                    final chapterTitle =
+                                        (_document != null &&
+                                                item.chapter >= 0 &&
+                                                item.chapter <
+                                                    _document!
+                                                        .chapters.length)
+                                            ? _document!
+                                                .chapters[item.chapter].title
+                                            : 'فصل ${item.chapter + 1}';
+                                    return Material(
+                                      color: item.color.withValues(alpha: 0.28),
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(16),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _setChapter(item.chapter);
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(14),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    width: 12,
+                                                    height: 12,
+                                                    decoration: BoxDecoration(
+                                                      color: item.color,
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(
+                                                        color: Colors.black26,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      chapterTitle,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        color: MarefatColors
+                                                            .forest,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  PopupMenuButton<String>(
+                                                    onSelected: (action) async {
+                                                      if (action == 'delete') {
+                                                        await _removeHighlight(
+                                                          item,
+                                                        );
+                                                        refresh(() {});
+                                                      } else if (action
+                                                          .startsWith(
+                                                        'color_',
+                                                      )) {
+                                                        final color =
+                                                            int.parse(
+                                                          action.substring(6),
+                                                        );
+                                                        await _updateHighlight(
+                                                          item.copyWith(
+                                                            colorIndex: color,
+                                                          ),
+                                                        );
+                                                        refresh(() {});
+                                                      } else if (action ==
+                                                          'note') {
+                                                        await _editHighlightNote(
+                                                          item,
+                                                        );
+                                                        refresh(() {});
+                                                      } else if (action ==
+                                                          'quote') {
+                                                        await showQuoteCardSheet(
+                                                          context: context,
+                                                          quote: item.text,
+                                                          bookTitle:
+                                                              widget.book.title,
+                                                          author:
+                                                              widget.book.author,
+                                                        );
+                                                      }
+                                                    },
+                                                    itemBuilder: (context) => [
+                                                      const PopupMenuItem(
+                                                        value: 'quote',
+                                                        child: Text(
+                                                          'کارت نقل‌قول',
+                                                        ),
+                                                      ),
+                                                      const PopupMenuItem(
+                                                        value: 'note',
+                                                        child: Text(
+                                                          'ویرایش یادداشت',
+                                                        ),
+                                                      ),
+                                                      ...List.generate(
+                                                        TextHighlight
+                                                            .palette.length,
+                                                        (i) => PopupMenuItem(
+                                                          value: 'color_$i',
+                                                          child: Row(
+                                                            children: [
+                                                              Container(
+                                                                width: 14,
+                                                                height: 14,
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color:
+                                                                      TextHighlight
+                                                                          .palette[i],
+                                                                  shape: BoxShape
+                                                                      .circle,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 8,
+                                                              ),
+                                                              Text(
+                                                                TextHighlight
+                                                                    .paletteLabels[i],
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const PopupMenuDivider(),
+                                                      const PopupMenuItem(
+                                                        value: 'delete',
+                                                        child: Text(
+                                                          'حذف',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                item.text,
+                                                maxLines: 4,
+                                                overflow: TextOverflow.ellipsis,
+                                                textDirection:
+                                                    _contentDirection,
+                                                style: const TextStyle(
+                                                  height: 1.65,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              if (item.note != null &&
+                                                  item.note!.isNotEmpty) ...[
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  item.note!,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.black
+                                                        .withValues(
+                                                      alpha: 0.55,
+                                                    ),
+                                                    height: 1.5,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _editHighlightNote(TextHighlight item) async {
+    final controller = TextEditingController(text: item.note ?? '');
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('یادداشت برجسته‌سازی'),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'یادداشت خود را بنویسید…',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('لغو'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final note = controller.text.trim();
+    controller.dispose();
+    if (saved != true) return;
+    await _updateHighlight(
+      item.copyWith(note: note, clearNote: note.isEmpty),
+    );
+  }
+
+  Future<void> _exportHighlights() async {
+    if (_highlights.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('برجسته‌سازی‌ای برای خروجی نیست.')),
+      );
+      return;
+    }
+    final buf = StringBuffer('برجسته‌شده‌های «${widget.book.title}»\n');
+    buf.writeln('—'.padRight(28, '—'));
+    final sorted = [..._highlights]
+      ..sort((a, b) {
+        final c = a.chapter.compareTo(b.chapter);
+        return c != 0 ? c : a.createdAtMs.compareTo(b.createdAtMs);
+      });
+    for (final h in sorted) {
+      buf.writeln();
+      buf.writeln('فصل ${h.chapter + 1}');
+      buf.writeln(h.text);
+      if (h.note != null && h.note!.isNotEmpty) {
+        buf.writeln('یادداشت: ${h.note}');
+      }
+    }
+    buf.writeln('\nمعرفت');
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('برجسته‌شده‌ها کپی شدند.')),
+    );
+  }
+
+  Future<void> _lookupSelection() async {
+    final word = DictionaryService.normalize(_selectedText);
+    if (word.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('واژه‌ای را برای معنا انتخاب کنید.')),
+      );
+      return;
+    }
+    final meaning = DictionaryService.lookup(word);
+    final suggestions = DictionaryService.suggestions(word);
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: MarefatColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                word,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: MarefatColors.forest,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                meaning ??
+                    'معنای مستقیمی پیدا نشد. چند واژهٔ نزدیک:',
+                style: const TextStyle(height: 1.7, fontWeight: FontWeight.w600),
+              ),
+              if (meaning == null) ...[
+                const SizedBox(height: 12),
+                for (final s in suggestions.take(5))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '• ${s.key}: ${s.value}',
+                      style: const TextStyle(height: 1.5, fontSize: 13),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startFocusMode() async {
+    final minutes = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: MarefatColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'حالت تمرکز',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'نوار ابزار پنهان می‌شود تا زمان تمرکز تمام شود.',
+                style: TextStyle(color: MarefatColors.muted),
+              ),
+              const SizedBox(height: 16),
+              for (final m in [10, 15, 25, 45])
+                ListTile(
+                  title: Text('$m دقیقه'),
+                  onTap: () => Navigator.pop(context, m),
+                ),
+              if (_focusActive)
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 0),
+                  child: const Text('پایان تمرکز'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (minutes == null) return;
+    _focusTimer?.cancel();
+    if (minutes == 0) {
+      setState(() {
+        _focusActive = false;
+        _focusRemainingSec = 0;
+        _chromeVisible = true;
+      });
+      return;
+    }
+    setState(() {
+      _focusActive = true;
+      _focusRemainingSec = minutes * 60;
+      _chromeVisible = false;
+    });
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _focusTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_focusRemainingSec <= 1) {
+        timer.cancel();
+        setState(() {
+          _focusActive = false;
+          _focusRemainingSec = 0;
+          _chromeVisible = true;
+        });
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('زمان تمرکز به پایان رسید.')),
+        );
+        return;
+      }
+      setState(() => _focusRemainingSec--);
+    });
+  }
+
+  String _formatFocus(int sec) {
+    final m = (sec ~/ 60).toString().padLeft(2, '0');
+    final s = (sec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   Future<void> _openSettings() async {
@@ -566,21 +1316,45 @@ class _ReaderPageState extends State<ReaderPage> {
                                       child: _ReaderAppBar(
                                         title:
                                             document?.title ?? widget.book.title,
-                                        subtitle: _isOffline
-                                            ? 'آماده برای مطالعهٔ آفلاین'
-                                            : 'همگام‌سازی شد',
+                                        subtitle: _focusActive
+                                            ? 'تمرکز ${_formatFocus(_focusRemainingSec)}'
+                                            : _isOffline
+                                                ? 'آماده برای مطالعهٔ آفلاین'
+                                                : 'همگام‌سازی شد',
                                         foreground: _foreground,
                                         bookmarked:
                                             _bookmarks.contains(_chapter),
+                                        highlightCount: _highlights.length,
                                         onBack: () =>
                                             Navigator.pop(context, _chapter),
                                         onSearch: _findInBook,
                                         onBookmark: _toggleBookmark,
+                                        onHighlights: _showHighlights,
+                                        onFocus: _startFocusMode,
                                         onSettings: _openSettings,
                                       ),
                                     )
                                   : const SizedBox.shrink(),
                             ),
+                            if (_focusActive)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                color: MarefatColors.forest.withValues(
+                                  alpha: 0.12,
+                                ),
+                                child: Text(
+                                  'تمرکز · ${_formatFocus(_focusRemainingSec)}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _foreground,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
                             LinearProgressIndicator(
                               value: progressValue,
                               minHeight: 2.5,
@@ -594,9 +1368,11 @@ class _ReaderPageState extends State<ReaderPage> {
                                 behavior: HitTestBehavior.translucent,
                                 onTap: _toggleChrome,
                                 child: SelectionArea(
-                                  onSelectionChanged: (selection) =>
-                                      _selectedText =
-                                          selection?.plainText ?? '',
+                                  onSelectionChanged: (selection) {
+                                    final text = selection?.plainText ?? '';
+                                    if (text == _selectedText) return;
+                                    setState(() => _selectedText = text);
+                                  },
                                   child: Scrollbar(
                                     controller: _scroll,
                                     child: SingleChildScrollView(
@@ -638,64 +1414,9 @@ class _ReaderPageState extends State<ReaderPage> {
                                               ),
                                               textAlign: _bodyAlign,
                                               textDirection: _contentDirection,
+                                              highlights: _chapterHighlights,
+                                              darkHighlights: _theme == 2,
                                             ),
-                                            if (_chapterHighlights
-                                                .isNotEmpty) ...[
-                                              const SizedBox(height: 30),
-                                              Divider(
-                                                color: _foreground.withValues(
-                                                  alpha: 0.12,
-                                                ),
-                                              ),
-                                              const Directionality(
-                                                textDirection:
-                                                    TextDirection.rtl,
-                                                child: Text(
-                                                  'برجسته‌شده‌ها',
-                                                  style: TextStyle(
-                                                    color: MarefatColors.forest,
-                                                    fontWeight: FontWeight.w800,
-                                                  ),
-                                                ),
-                                              ),
-                                              ..._chapterHighlights.map(
-                                                (text) => Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                    top: 10,
-                                                  ),
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.all(
-                                                      12,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(
-                                                        0xFFFFEDAA,
-                                                      ).withValues(
-                                                        alpha: _theme == 2
-                                                            ? 0.2
-                                                            : 0.65,
-                                                      ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                        14,
-                                                      ),
-                                                    ),
-                                                    child: Text(
-                                                      text,
-                                                      textDirection:
-                                                          _contentDirection,
-                                                      style: TextStyle(
-                                                        color: _foreground,
-                                                        fontSize: 14,
-                                                        height: 1.7,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
                                           ],
                                         ),
                                       ),
@@ -719,10 +1440,33 @@ class _ReaderPageState extends State<ReaderPage> {
                                 chapter: _chapter,
                                 total: document!.chapters.length,
                                 fontSize: _fontSize,
+                                hasSelection: _selectedText.trim().length >= 2,
+                                highlightCount: _chapterHighlights.length,
                                 onPrev: () => _setChapter(_chapter - 1),
                                 onNext: () => _setChapter(_chapter + 1),
                                 onChapter: _setChapter,
                                 onHighlight: _addHighlight,
+                                onHighlights: _showHighlights,
+                                onLookup: _lookupSelection,
+                                onQuote: () {
+                                  final text = _selectedText.trim();
+                                  if (text.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'برای کارت نقل‌قول متن را انتخاب کنید.',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  showQuoteCardSheet(
+                                    context: context,
+                                    quote: text,
+                                    bookTitle: widget.book.title,
+                                    author: widget.book.author,
+                                  );
+                                },
                                 onContents: _showContents,
                                 onFontDown: () {
                                   setState(
@@ -760,9 +1504,12 @@ class _ReaderAppBar extends StatelessWidget {
     required this.subtitle,
     required this.foreground,
     required this.bookmarked,
+    required this.highlightCount,
     required this.onBack,
     required this.onSearch,
     required this.onBookmark,
+    required this.onHighlights,
+    required this.onFocus,
     required this.onSettings,
   });
 
@@ -770,9 +1517,12 @@ class _ReaderAppBar extends StatelessWidget {
   final String subtitle;
   final Color foreground;
   final bool bookmarked;
+  final int highlightCount;
   final VoidCallback onBack;
   final VoidCallback onSearch;
   final VoidCallback onBookmark;
+  final VoidCallback onHighlights;
+  final VoidCallback onFocus;
   final VoidCallback onSettings;
 
   @override
@@ -817,6 +1567,23 @@ class _ReaderAppBar extends StatelessWidget {
             tooltip: 'جست‌وجو',
           ),
           IconButton(
+            onPressed: onFocus,
+            icon: Icon(Icons.timer_outlined, color: foreground),
+            tooltip: 'حالت تمرکز',
+          ),
+          IconButton(
+            onPressed: onHighlights,
+            tooltip: 'برجسته‌شده‌ها',
+            icon: Badge(
+              isLabelVisible: highlightCount > 0,
+              label: Text(
+                '$highlightCount',
+                style: const TextStyle(fontSize: 10),
+              ),
+              child: Icon(Icons.border_color_rounded, color: foreground),
+            ),
+          ),
+          IconButton(
             onPressed: onBookmark,
             icon: Icon(
               bookmarked
@@ -844,10 +1611,15 @@ class _ReaderDock extends StatelessWidget {
     required this.chapter,
     required this.total,
     required this.fontSize,
+    required this.hasSelection,
+    required this.highlightCount,
     required this.onPrev,
     required this.onNext,
     required this.onChapter,
     required this.onHighlight,
+    required this.onHighlights,
+    required this.onLookup,
+    required this.onQuote,
     required this.onContents,
     required this.onFontDown,
     required this.onFontUp,
@@ -858,10 +1630,15 @@ class _ReaderDock extends StatelessWidget {
   final int chapter;
   final int total;
   final double fontSize;
+  final bool hasSelection;
+  final int highlightCount;
   final VoidCallback onPrev;
   final VoidCallback onNext;
   final ValueChanged<int> onChapter;
   final VoidCallback onHighlight;
+  final VoidCallback onHighlights;
+  final VoidCallback onLookup;
+  final VoidCallback onQuote;
   final VoidCallback onContents;
   final VoidCallback onFontDown;
   final VoidCallback onFontUp;
@@ -927,8 +1704,50 @@ class _ReaderDock extends StatelessWidget {
                 children: [
                   IconButton(
                     onPressed: onHighlight,
-                    tooltip: 'برجسته‌سازی',
-                    icon: Icon(Icons.highlight_alt_rounded, color: foreground),
+                    tooltip: hasSelection
+                        ? 'برجسته‌سازی انتخاب'
+                        : 'ابتدا متن را انتخاب کنید',
+                    icon: Icon(
+                      Icons.highlight_alt_rounded,
+                      color: hasSelection
+                          ? MarefatColors.forest
+                          : foreground.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onLookup,
+                    tooltip: 'معنای واژه',
+                    icon: Icon(
+                      Icons.menu_book_outlined,
+                      color: hasSelection
+                          ? MarefatColors.forest
+                          : foreground.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onQuote,
+                    tooltip: 'کارت نقل‌قول',
+                    icon: Icon(
+                      Icons.format_quote_rounded,
+                      color: hasSelection
+                          ? MarefatColors.brass
+                          : foreground.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onHighlights,
+                    tooltip: 'فهرست برجسته‌شده‌ها',
+                    icon: Badge(
+                      isLabelVisible: highlightCount > 0,
+                      label: Text(
+                        '$highlightCount',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                      child: Icon(
+                        Icons.collections_bookmark_rounded,
+                        color: foreground,
+                      ),
+                    ),
                   ),
                   IconButton(
                     onPressed: onContents,

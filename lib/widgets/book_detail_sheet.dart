@@ -16,6 +16,8 @@ Future<void> showBookDetailSheet({
   required VoidCallback onToggleFavorite,
   required VoidCallback onOpen,
   Uint8List? coverBytes,
+  List<Book> related = const [],
+  ValueChanged<Book>? onOpenRelated,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -29,6 +31,8 @@ Future<void> showBookDetailSheet({
       isFavorite: isFavorite,
       onToggleFavorite: onToggleFavorite,
       onOpen: onOpen,
+      related: related,
+      onOpenRelated: onOpenRelated,
     ),
   );
 }
@@ -42,6 +46,8 @@ class _BookDetailSheet extends StatefulWidget {
     required this.onToggleFavorite,
     required this.onOpen,
     this.coverBytes,
+    this.related = const [],
+    this.onOpenRelated,
   });
 
   final Book book;
@@ -51,6 +57,8 @@ class _BookDetailSheet extends StatefulWidget {
   final bool isFavorite;
   final VoidCallback onToggleFavorite;
   final VoidCallback onOpen;
+  final List<Book> related;
+  final ValueChanged<Book>? onOpenRelated;
 
   @override
   State<_BookDetailSheet> createState() => _BookDetailSheetState();
@@ -188,6 +196,72 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                         color: MarefatColors.brass,
                         fontWeight: FontWeight.w700,
                       ),
+                    ),
+                  ),
+                ],
+                if (widget.related.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      'کتاب‌های مرتبط',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 108,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: widget.related.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, index) {
+                        final related = widget.related[index];
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () {
+                            Navigator.pop(context);
+                            widget.onOpenRelated?.call(related);
+                          },
+                          child: Container(
+                            width: 150,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: MarefatColors.mist.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: MarefatColors.mistDeep),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  related.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  related.category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: MarefatColors.forest,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
