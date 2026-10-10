@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../models/book.dart';
 import '../services/notebook_store.dart';
 import '../theme/marefat_theme.dart';
+import '../widgets/share_actions_sheet.dart';
 
 class NotebookPage extends StatefulWidget {
   const NotebookPage({
@@ -133,10 +133,12 @@ class _NotebookPageState extends State<NotebookPage> {
 
   Future<void> _export() async {
     final text = NotebookStore.exportText(_visible);
-    await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('دفترچه در کلیپ‌بورد کپی شد.')),
+    await showShareActionsSheet(
+      context: context,
+      text: text,
+      title: 'خروجی دفترچه',
+      subject: 'دفترچهٔ معرفت',
     );
   }
 
@@ -166,6 +168,7 @@ class _NotebookPageState extends State<NotebookPage> {
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'notebook_fab',
           onPressed: widget.books.isEmpty ? null : _addFree,
           icon: const Icon(Icons.note_add_rounded),
           label: const Text('یادداشت'),

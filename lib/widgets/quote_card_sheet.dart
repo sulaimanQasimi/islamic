@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../services/share_helper.dart';
 import '../theme/marefat_theme.dart';
 
 Future<void> showQuoteCardSheet({
@@ -115,24 +115,46 @@ class _QuoteCardSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: shareText));
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('کارت نقل‌قول در کلیپ‌بورد کپی شد.'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await ShareHelper.copyText(shareText);
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('نقل‌قول کپی شد.')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.copy_rounded),
+                    label: const Text('کپی'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      foregroundColor: MarefatColors.forest,
                     ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.copy_rounded),
-              label: const Text('کپی برای اشتراک'),
-              style: FilledButton.styleFrom(
-                backgroundColor: MarefatColors.forest,
-                minimumSize: const Size.fromHeight(48),
-              ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await ShareHelper.shareText(
+                        shareText,
+                        subject: 'نقل‌قول از $bookTitle',
+                      );
+                    },
+                    icon: const Icon(Icons.share_rounded),
+                    label: const Text('اشتراک'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: MarefatColors.forest,
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                  ),
+                ),
+              ],
             ),
             TextButton(
               onPressed: () => Navigator.pop(context),

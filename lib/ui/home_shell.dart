@@ -8,15 +8,18 @@ import '../models/book.dart';
 import '../services/app_storage.dart';
 import '../services/book_backend.dart';
 import '../services/book_cache.dart';
+import '../services/book_pdf_exporter.dart';
 import '../services/epub_parser.dart';
 import '../services/night_auto.dart';
 import '../services/reading_goals.dart';
+import '../services/share_helper.dart';
 import '../services/study_reminder.dart';
 import '../theme/marefat_theme.dart';
 import '../widgets/book_cover_card.dart';
 import '../widgets/book_detail_sheet.dart';
 import '../widgets/goal_progress_card.dart';
 import '../widgets/marefat_backdrop.dart';
+import '../widgets/share_actions_sheet.dart';
 import '../widgets/shimmer_library.dart';
 import 'collections_page.dart';
 import 'history_page.dart';
@@ -371,8 +374,75 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       onOpen: () => _open(book),
       related: _relatedFor(book),
       onOpenRelated: _showDetail,
+      onShareText: () => _shareBookText(book),
+      onSharePdf: () => _shareBookPdf(book),
     );
     if (mounted) setState(() {});
+  }
+
+  Future<void> _shareBookText(Book book) async {
+    final text = StringBuffer()
+      ..writeln(book.title)
+      ..writeln(book.author)
+      ..writeln()
+      ..writeln(book.description)
+      ..writeln()
+      ..writeln('دسته: ${book.category}')
+      ..writeln('معرفت');
+    if (!mounted) return;
+    await showShareActionsSheet(
+      context: context,
+      text: text.toString(),
+      title: 'اشتراک معرفی کتاب',
+      subject: book.title,
+    );
+  }
+
+  Future<void> _shareBookPdf(Book book) async {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Expanded(child: Text('در حال ساخت PDF کتاب…')),
+            ],
+          ),
+        ),
+      ),
+    );
+    try {
+      final bytes = await _backend.downloadBytes(book);
+      final doc = EpubParser.parse(
+        bytes,
+        fallbackTitle: book.title,
+        fallbackAuthor: book.author,
+      );
+      final pdfBytes = await BookPdfExporter.build(
+        book: book,
+        document: doc,
+      );
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      await ShareHelper.shareBytesAsFile(
+        bytes: pdfBytes,
+        fileName: BookPdfExporter.fileNameFor(book),
+        mimeType: 'application/pdf',
+        subject: book.title,
+        text: 'نسخهٔ PDF «${book.title}» از معرفت',
+      );
+    } catch (error) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ساخت PDF ممکن نشد: $error')),
+        );
+      }
+    }
   }
 
   Future<void> _openHistory() async {
@@ -2045,18 +2115,22 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: (dark ? MarefatColors.nightSurface : Colors.white)
-            .withValues(alpha: 0.88),
+    final bg = (dark ? MarefatColors.nightSurface : Colors.white)
+        .withValues(alpha: 0.88);
+    return Material(
+      color: bg,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
+        side: BorderSide(
           color: MarefatColors.mistDeep.withValues(alpha: dark ? 0.25 : 1),
         ),
       ),
-      child: child,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: child,
+      ),
     );
   }
 }

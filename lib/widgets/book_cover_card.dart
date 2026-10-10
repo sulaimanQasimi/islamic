@@ -18,6 +18,7 @@ class BookCoverCard extends StatelessWidget {
     this.onFavoriteToggle,
     this.index = 0,
     this.compact = false,
+    this.heroTag,
   });
 
   final Book book;
@@ -29,6 +30,10 @@ class BookCoverCard extends StatelessWidget {
   final VoidCallback? onFavoriteToggle;
   final int index;
   final bool compact;
+
+  /// Unique tag when Hero flight is needed. Null disables Hero (avoids
+  /// duplicate-tag crashes when the same book appears in multiple lists).
+  final String? heroTag;
 
   double get _progressRatio {
     final total = chapterCount <= 0 ? 1 : chapterCount;
@@ -72,8 +77,7 @@ class BookCoverCard extends StatelessWidget {
             ),
             child: AspectRatio(
               aspectRatio: compact ? 0.72 : 0.68,
-              child: Hero(
-                tag: 'cover_${book.id}',
+              child: _maybeHero(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(18),
                   child: Stack(
@@ -270,6 +274,12 @@ class BookCoverCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _maybeHero({required Widget child}) {
+    final tag = heroTag;
+    if (tag == null || tag.isEmpty) return child;
+    return Hero(tag: tag, child: child);
   }
 }
 

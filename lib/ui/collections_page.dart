@@ -126,6 +126,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
       child: Scaffold(
         appBar: AppBar(title: const Text('قفسه‌ها')),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'collections_fab',
           onPressed: _create,
           icon: const Icon(Icons.create_new_folder_rounded),
           label: const Text('قفسهٔ جدید'),

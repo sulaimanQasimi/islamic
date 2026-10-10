@@ -18,6 +18,8 @@ Future<void> showBookDetailSheet({
   Uint8List? coverBytes,
   List<Book> related = const [],
   ValueChanged<Book>? onOpenRelated,
+  VoidCallback? onShareText,
+  VoidCallback? onSharePdf,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -33,6 +35,8 @@ Future<void> showBookDetailSheet({
       onOpen: onOpen,
       related: related,
       onOpenRelated: onOpenRelated,
+      onShareText: onShareText,
+      onSharePdf: onSharePdf,
     ),
   );
 }
@@ -48,6 +52,8 @@ class _BookDetailSheet extends StatefulWidget {
     this.coverBytes,
     this.related = const [],
     this.onOpenRelated,
+    this.onShareText,
+    this.onSharePdf,
   });
 
   final Book book;
@@ -59,6 +65,8 @@ class _BookDetailSheet extends StatefulWidget {
   final VoidCallback onOpen;
   final List<Book> related;
   final ValueChanged<Book>? onOpenRelated;
+  final VoidCallback? onShareText;
+  final VoidCallback? onSharePdf;
 
   @override
   State<_BookDetailSheet> createState() => _BookDetailSheetState();
@@ -265,7 +273,41 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 22),
+                const SizedBox(height: 16),
+                if (widget.onShareText != null || widget.onSharePdf != null)
+                  Row(
+                    children: [
+                      if (widget.onShareText != null)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              widget.onShareText!();
+                            },
+                            icon: const Icon(Icons.share_rounded, size: 18),
+                            label: const Text('اشتراک متن'),
+                          ),
+                        ),
+                      if (widget.onShareText != null &&
+                          widget.onSharePdf != null)
+                        const SizedBox(width: 10),
+                      if (widget.onSharePdf != null)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              widget.onSharePdf!();
+                            },
+                            icon: const Icon(
+                              Icons.picture_as_pdf_rounded,
+                              size: 18,
+                            ),
+                            label: const Text('اشتراک PDF'),
+                          ),
+                        ),
+                    ],
+                  ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(

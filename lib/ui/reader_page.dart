@@ -11,12 +11,15 @@ import '../services/book_backend.dart';
 import '../services/book_cache.dart';
 import '../services/dictionary_service.dart';
 import '../services/epub_parser.dart';
+import '../services/book_pdf_exporter.dart';
 import '../services/night_auto.dart';
 import '../services/reading_goals.dart';
 import '../services/reading_history.dart';
+import '../services/share_helper.dart';
 import '../theme/marefat_theme.dart';
 import '../widgets/epub_html_view.dart';
 import '../widgets/quote_card_sheet.dart';
+import '../widgets/share_actions_sheet.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({super.key, required this.book, required this.backend});
@@ -824,10 +827,155 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       }
     }
     buf.writeln('\nمعرفت');
-    await Clipboard.setData(ClipboardData(text: buf.toString()));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('برجسته‌شده‌ها کپی شدند.')),
+    await showShareActionsSheet(
+      context: context,
+      text: buf.toString(),
+      title: 'خروجی برجسته‌شده‌ها',
+      subject: 'برجسته‌شده‌های ${widget.book.title}',
+    );
+  }
+
+  Future<void> _shareSelection() async {
+    final text = _selectedText.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('متن را برای کپی یا اشتراک انتخاب کنید.')),
+      );
+      return;
+    }
+    final payload =
+        '"$text"\n— ${widget.book.title} · ${widget.book.author}\nمعرفت';
+    await showShareActionsSheet(
+      context: context,
+      text: payload,
+      title: 'کپی و اشتراک متن',
+      subject: widget.book.title,
+    );
+  }
+
+  Future<void> _shareBookPdf({bool currentChapterOnly = false}) async {
+    final doc = _document;
+    if (doc == null) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Expanded(child: Text('در حال ساخت PDF…')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final exportDoc = currentChapterOnly
+          ? EpubDocument(
+              title: doc.title,
+              author: doc.author,
+              chapters: [
+                if (_chapter >= 0 && _chapter < doc.chapters.length)
+                  doc.chapters[_chapter],
+              ],
+            )
+          : doc;
+      final bytes = await BookPdfExporter.build(
+        book: widget.book,
+        document: exportDoc,
+      );
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      final name = currentChapterOnly
+          ? 'Marefat_${widget.book.id}_ch${_chapter + 1}.pdf'
+          : BookPdfExporter.fileNameFor(widget.book);
+      await ShareHelper.shareBytesAsFile(
+        bytes: bytes,
+        fileName: name,
+        mimeType: 'application/pdf',
+        subject: widget.book.title,
+        text: 'نسخهٔ PDF «${widget.book.title}» از معرفت',
+      );
+    } catch (error) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ساخت PDF ممکن نشد: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showShareMenu() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: MarefatColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.black12,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const ListTile(
+                title: Text(
+                  'کپی و اشتراک',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.text_fields_rounded),
+                title: const Text('متن انتخاب‌شده'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareSelection();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.highlight_rounded),
+                title: const Text('برجسته‌شده‌ها'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportHighlights();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_rounded),
+                title: const Text('PDF همین فصل'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareBookPdf(currentChapterOnly: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: const Text('PDF کل کتاب'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareBookPdf();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1331,6 +1479,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                         onBookmark: _toggleBookmark,
                                         onHighlights: _showHighlights,
                                         onFocus: _startFocusMode,
+                                        onShare: _showShareMenu,
                                         onSettings: _openSettings,
                                       ),
                                     )
@@ -1448,6 +1597,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                 onHighlight: _addHighlight,
                                 onHighlights: _showHighlights,
                                 onLookup: _lookupSelection,
+                                onShare: _shareSelection,
                                 onQuote: () {
                                   final text = _selectedText.trim();
                                   if (text.isEmpty) {
@@ -1510,6 +1660,7 @@ class _ReaderAppBar extends StatelessWidget {
     required this.onBookmark,
     required this.onHighlights,
     required this.onFocus,
+    required this.onShare,
     required this.onSettings,
   });
 
@@ -1523,6 +1674,7 @@ class _ReaderAppBar extends StatelessWidget {
   final VoidCallback onBookmark;
   final VoidCallback onHighlights;
   final VoidCallback onFocus;
+  final VoidCallback onShare;
   final VoidCallback onSettings;
 
   @override
@@ -1572,6 +1724,11 @@ class _ReaderAppBar extends StatelessWidget {
             tooltip: 'حالت تمرکز',
           ),
           IconButton(
+            onPressed: onShare,
+            icon: Icon(Icons.share_rounded, color: foreground),
+            tooltip: 'کپی و اشتراک',
+          ),
+          IconButton(
             onPressed: onHighlights,
             tooltip: 'برجسته‌شده‌ها',
             icon: Badge(
@@ -1619,6 +1776,7 @@ class _ReaderDock extends StatelessWidget {
     required this.onHighlight,
     required this.onHighlights,
     required this.onLookup,
+    required this.onShare,
     required this.onQuote,
     required this.onContents,
     required this.onFontDown,
@@ -1638,6 +1796,7 @@ class _ReaderDock extends StatelessWidget {
   final VoidCallback onHighlight;
   final VoidCallback onHighlights;
   final VoidCallback onLookup;
+  final VoidCallback onShare;
   final VoidCallback onQuote;
   final VoidCallback onContents;
   final VoidCallback onFontDown;
@@ -1719,6 +1878,16 @@ class _ReaderDock extends StatelessWidget {
                     tooltip: 'معنای واژه',
                     icon: Icon(
                       Icons.menu_book_outlined,
+                      color: hasSelection
+                          ? MarefatColors.forest
+                          : foreground.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onShare,
+                    tooltip: 'کپی و اشتراک',
+                    icon: Icon(
+                      Icons.ios_share_rounded,
                       color: hasSelection
                           ? MarefatColors.forest
                           : foreground.withValues(alpha: 0.55),
