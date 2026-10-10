@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../models/book.dart';
 import 'book_cache.dart';
 import 'epub_parser.dart';
@@ -23,7 +25,7 @@ class LibrarySearch {
   static Future<List<LibrarySearchHit>> search({
     required List<Book> books,
     required String query,
-    Future<List<int>?> Function(Book book)? loadBytes,
+    Future<Uint8List?> Function(Book book)? loadBytes,
     int maxHits = 40,
   }) async {
     final q = query.trim().toLowerCase();
@@ -33,7 +35,7 @@ class LibrarySearch {
     for (final book in books) {
       if (hits.length >= maxHits) break;
       try {
-        var bytes = await BookCache.read(book.id);
+        Uint8List? bytes = await BookCache.read(book.id);
         bytes ??= loadBytes == null ? null : await loadBytes(book);
         if (bytes == null) {
           // Metadata-only fallback
