@@ -6,16 +6,18 @@ import '../theme/marefat_theme.dart';
 
 /// Soft atmospheric background with a subtle geometric manuscript motif.
 class MarefatBackdrop extends StatelessWidget {
-  const MarefatBackdrop({super.key, required this.child, this.dark = false});
+  const MarefatBackdrop({super.key, required this.child, this.dark});
 
   final Widget child;
-  final bool dark;
+  /// When null, follows [ThemeData.brightness].
+  final bool? dark;
 
   @override
   Widget build(BuildContext context) {
-    final top = dark ? const Color(0xFF0F2421) : MarefatColors.mist;
-    final mid = dark ? MarefatColors.night : const Color(0xFFEEF6F2);
-    final bottom = dark ? MarefatColors.nightSurface : MarefatColors.surface;
+    final isDark = dark ?? MarefatColors.isDark(context);
+    final top = isDark ? const Color(0xFF0F2421) : MarefatColors.mist;
+    final mid = isDark ? MarefatColors.night : const Color(0xFFEEF6F2);
+    final bottom = isDark ? MarefatColors.nightSurface : MarefatColors.surface;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -31,8 +33,8 @@ class MarefatBackdrop extends StatelessWidget {
           Positioned.fill(
             child: CustomPaint(
               painter: _StarLatticePainter(
-                color: (dark ? MarefatColors.brassSoft : MarefatColors.forest)
-                    .withValues(alpha: dark ? 0.055 : 0.045),
+                color: (isDark ? MarefatColors.brassSoft : MarefatColors.forest)
+                    .withValues(alpha: isDark ? 0.055 : 0.045),
               ),
             ),
           ),
@@ -41,8 +43,8 @@ class MarefatBackdrop extends StatelessWidget {
             left: -60,
             child: _GlowOrb(
               size: 220,
-              color: (dark ? MarefatColors.sage : MarefatColors.brassSoft)
-                  .withValues(alpha: dark ? 0.12 : 0.18),
+              color: (isDark ? MarefatColors.sage : MarefatColors.brassSoft)
+                  .withValues(alpha: isDark ? 0.12 : 0.18),
             ),
           ),
           Positioned(
@@ -50,8 +52,8 @@ class MarefatBackdrop extends StatelessWidget {
             right: -90,
             child: _GlowOrb(
               size: 260,
-              color: (dark ? MarefatColors.brass : MarefatColors.forest)
-                  .withValues(alpha: dark ? 0.1 : 0.1),
+              color: (isDark ? MarefatColors.brass : MarefatColors.forest)
+                  .withValues(alpha: isDark ? 0.1 : 0.1),
             ),
           ),
           child,

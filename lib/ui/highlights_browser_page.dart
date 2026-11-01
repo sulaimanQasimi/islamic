@@ -124,10 +124,12 @@ class _HighlightsBrowserPageState extends State<HighlightsBrowserPage> {
               ),
             Expanded(
               child: filtered.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'موردی پیدا نشد.',
-                        style: TextStyle(color: MarefatColors.muted),
+                        style: TextStyle(
+                          color: MarefatColors.mutedText(context),
+                        ),
                       ),
                     )
                   : ListView.separated(

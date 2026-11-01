@@ -107,28 +107,44 @@ class _MarefatAppState extends State<MarefatApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MarefatAppScope(
-      themeMode: _themeMode,
-      onThemeModeChanged: _setThemeMode,
-      onNightScheduleChanged: _refreshDisplayTheme,
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'معرفت',
-        locale: const Locale('fa'),
-        supportedLocales: const [Locale('fa'), Locale('en')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        builder: (context, child) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: child ?? const SizedBox.shrink(),
+    final isDark = _displayTheme == ThemeMode.dark ||
+        (_displayTheme == ThemeMode.system &&
+            WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+                Brightness.dark);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor:
+            isDark ? MarefatColors.night : MarefatColors.surface,
+        systemNavigationBarIconBrightness:
+            isDark ? Brightness.light : Brightness.dark,
+      ),
+      child: MarefatAppScope(
+        themeMode: _themeMode,
+        onThemeModeChanged: _setThemeMode,
+        onNightScheduleChanged: _refreshDisplayTheme,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'معرفت',
+          locale: const Locale('fa'),
+          supportedLocales: const [Locale('fa'), Locale('en')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          builder: (context, child) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: child ?? const SizedBox.shrink(),
+          ),
+          theme: MarefatTheme.light(),
+          darkTheme: MarefatTheme.dark(),
+          themeMode: _displayTheme,
+          home: _ready ? const HomeShell() : const SplashPage(),
         ),
-        theme: MarefatTheme.light(),
-        darkTheme: MarefatTheme.dark(),
-        themeMode: _displayTheme,
-        home: _ready ? const HomeShell() : const SplashPage(),
       ),
     );
   }

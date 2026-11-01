@@ -81,11 +81,14 @@ class _LibrarySearchPageState extends State<LibrarySearchPage> {
             if (_searching) const LinearProgressIndicator(),
             Expanded(
               child: _hits.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'نتیجه‌ای نیست.\nکتاب‌های کش‌شده سریع‌تر جست‌وجو می‌شوند.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: MarefatColors.muted, height: 1.6),
+                        style: TextStyle(
+                          color: MarefatColors.mutedText(context),
+                          height: 1.6,
+                        ),
                       ),
                     )
                   : ListView.separated(

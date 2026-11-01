@@ -17,6 +17,44 @@ class MarefatColors {
   static const night = Color(0xFF0A1A18);
   static const nightSurface = Color(0xFF132826);
   static const muted = Color(0xFF5A716B);
+  static const onDark = Color(0xFFE6F0EC);
+  static const mutedDark = Color(0xFF8AA39B);
+  static const mistDark = Color(0xFF1B322E);
+  static const mistDeepDark = Color(0xFF243F39);
+
+  static bool isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  static Color text(BuildContext context) =>
+      isDark(context) ? onDark : ink;
+
+  static Color mutedText(BuildContext context) =>
+      isDark(context) ? mutedDark : muted;
+
+  static Color card(BuildContext context) =>
+      isDark(context) ? nightSurface : Colors.white;
+
+  static Color sheet(BuildContext context) =>
+      isDark(context) ? nightSurface : surface;
+
+  static Color softFill(BuildContext context) =>
+      isDark(context) ? mistDark : mist;
+
+  static Color softBorder(BuildContext context) =>
+      isDark(context) ? mistDeepDark : mistDeep;
+
+  static Color inputFill(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.06)
+      : Colors.white.withValues(alpha: 0.88);
+
+  static Color hairline(BuildContext context) =>
+      isDark(context) ? Colors.white24 : Colors.black12;
+
+  static Color accent(BuildContext context) =>
+      isDark(context) ? sage : forest;
+
+  static Color accentSoft(BuildContext context) =>
+      isDark(context) ? brassSoft : brass;
 }
 
 class MarefatTheme {
@@ -46,7 +84,6 @@ class MarefatTheme {
   }
 
   static TextTheme _textTheme(Color color) {
-    // Vazirmatn via google_fonts; falls back if runtime fetch is disabled.
     TextTheme base;
     try {
       base = GoogleFonts.vazirmatnTextTheme().apply(
@@ -91,9 +128,16 @@ class MarefatTheme {
 
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.light,
       colorScheme: scheme,
       scaffoldBackgroundColor: MarefatColors.mist,
       textTheme: _textTheme(MarefatColors.ink),
+      dividerColor: MarefatColors.mistDeep,
+      cardColor: Colors.white,
+      dialogTheme: DialogThemeData(
+        backgroundColor: MarefatColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      ),
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -104,6 +148,7 @@ class MarefatTheme {
           fontWeight: FontWeight.w800,
           color: MarefatColors.ink,
         ),
+        iconTheme: const IconThemeData(color: MarefatColors.ink),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
@@ -128,10 +173,17 @@ class MarefatTheme {
       chipTheme: ChipThemeData(
         selectedColor: MarefatColors.forest,
         backgroundColor: Colors.white.withValues(alpha: 0.75),
-        side: BorderSide(color: MarefatColors.mistDeep),
+        disabledColor: MarefatColors.mistDeep,
+        side: const BorderSide(color: MarefatColors.mistDeep),
         labelStyle: _safeVazirmatn(
           fontSize: 12,
           fontWeight: FontWeight.w700,
+          color: MarefatColors.ink,
+        ),
+        secondaryLabelStyle: _safeVazirmatn(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
@@ -152,6 +204,22 @@ class MarefatTheme {
           textStyle: _safeVazirmatn(fontWeight: FontWeight.w800),
         ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: MarefatColors.forest,
+          side: const BorderSide(color: MarefatColors.mistDeep),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: MarefatColors.forest),
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: MarefatColors.forest,
+        textColor: MarefatColors.ink,
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: MarefatColors.ink,
@@ -160,9 +228,14 @@ class MarefatTheme {
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: MarefatColors.surface,
+        modalBackgroundColor: MarefatColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: MarefatColors.surface,
+        textStyle: _safeVazirmatn(color: MarefatColors.ink),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -173,7 +246,7 @@ class MarefatTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: MarefatColors.mistDeep),
+          borderSide: const BorderSide(color: MarefatColors.mistDeep),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
@@ -184,6 +257,35 @@ class MarefatTheme {
           vertical: 14,
         ),
         hintStyle: _safeVazirmatn(color: MarefatColors.muted),
+        labelStyle: _safeVazirmatn(color: MarefatColors.muted),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: MarefatColors.forest,
+        linearTrackColor: MarefatColors.mistDeep,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? MarefatColors.forest
+              : Colors.white,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? MarefatColors.forest.withValues(alpha: 0.35)
+              : MarefatColors.mistDeep,
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: MarefatColors.forest,
+        foregroundColor: Colors.white,
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: MarefatColors.mistDeep),
+        ),
       ),
     );
   }
@@ -197,24 +299,32 @@ class MarefatTheme {
       surface: MarefatColors.nightSurface,
       onPrimary: Colors.white,
       onSecondary: MarefatColors.night,
-      onSurface: const Color(0xFFE6F0EC),
+      onSurface: MarefatColors.onDark,
     );
 
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.dark,
       colorScheme: scheme,
       scaffoldBackgroundColor: MarefatColors.night,
-      textTheme: _textTheme(const Color(0xFFE6F0EC)),
+      textTheme: _textTheme(MarefatColors.onDark),
+      dividerColor: MarefatColors.mistDeepDark,
+      cardColor: MarefatColors.nightSurface,
+      dialogTheme: DialogThemeData(
+        backgroundColor: MarefatColors.nightSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      ),
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: const Color(0xFFE6F0EC),
+        foregroundColor: MarefatColors.onDark,
         titleTextStyle: _safeVazirmatn(
           fontSize: 18,
           fontWeight: FontWeight.w800,
-          color: const Color(0xFFE6F0EC),
+          color: MarefatColors.onDark,
         ),
+        iconTheme: const IconThemeData(color: MarefatColors.onDark),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
@@ -225,25 +335,132 @@ class MarefatTheme {
           return _safeVazirmatn(
             fontSize: 11,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            color: selected
-                ? MarefatColors.brassSoft
-                : const Color(0xFF8AA39B),
+            color: selected ? MarefatColors.brassSoft : MarefatColors.mutedDark,
           );
         }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? MarefatColors.brassSoft : MarefatColors.mutedDark,
+            size: 22,
+          );
+        }),
+      ),
+      chipTheme: ChipThemeData(
+        selectedColor: MarefatColors.sage,
+        backgroundColor: Colors.white.withValues(alpha: 0.08),
+        disabledColor: MarefatColors.mistDeepDark,
+        side: const BorderSide(color: MarefatColors.mistDeepDark),
+        labelStyle: _safeVazirmatn(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: MarefatColors.onDark,
+        ),
+        secondaryLabelStyle: _safeVazirmatn(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: MarefatColors.sage,
+        thumbColor: MarefatColors.brassSoft,
+        inactiveTrackColor: MarefatColors.sage.withValues(alpha: 0.2),
+        overlayColor: MarefatColors.sage.withValues(alpha: 0.14),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: MarefatColors.sage,
           foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: _safeVazirmatn(fontWeight: FontWeight.w800),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: MarefatColors.brassSoft,
+          side: const BorderSide(color: MarefatColors.mistDeepDark),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: MarefatColors.brassSoft),
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: MarefatColors.brassSoft,
+        textColor: MarefatColors.onDark,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: MarefatColors.mistDark,
+        contentTextStyle: _safeVazirmatn(color: MarefatColors.onDark),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: MarefatColors.nightSurface,
+        modalBackgroundColor: MarefatColors.nightSurface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: MarefatColors.nightSurface,
+        textStyle: _safeVazirmatn(color: MarefatColors.onDark),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.06),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: MarefatColors.mistDeepDark),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: MarefatColors.sage, width: 1.4),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        hintStyle: _safeVazirmatn(color: MarefatColors.mutedDark),
+        labelStyle: _safeVazirmatn(color: MarefatColors.mutedDark),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: MarefatColors.sage,
+        linearTrackColor: MarefatColors.mistDeepDark,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? MarefatColors.brassSoft
+              : MarefatColors.onDark,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? MarefatColors.sage.withValues(alpha: 0.45)
+              : MarefatColors.mistDeepDark,
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: MarefatColors.sage,
+        foregroundColor: Colors.white,
+      ),
+      cardTheme: CardThemeData(
+        color: MarefatColors.nightSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: MarefatColors.mistDeepDark),
         ),
       ),
     );

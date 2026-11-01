@@ -9,6 +9,7 @@ class SplashPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = MarefatColors.accent(context);
     return MarefatBackdrop(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -20,15 +21,20 @@ class SplashPage extends StatelessWidget {
                 width: 88,
                 height: 88,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [MarefatColors.ink, MarefatColors.forest],
+                    colors: [
+                      MarefatColors.isDark(context)
+                          ? MarefatColors.nightSurface
+                          : MarefatColors.ink,
+                      accent,
+                    ],
                   ),
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: MarefatColors.forest.withValues(alpha: 0.35),
+                      color: accent.withValues(alpha: 0.35),
                       blurRadius: 28,
                       offset: const Offset(0, 14),
                     ),
@@ -52,7 +58,7 @@ class SplashPage extends StatelessWidget {
                 'معرفت',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w900,
-                      color: MarefatColors.ink,
+                      color: MarefatColors.text(context),
                       fontSize: 42,
                     ),
               )
@@ -63,7 +69,7 @@ class SplashPage extends StatelessWidget {
               Text(
                 'آرام بخوان، عمیق بیندیش',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: MarefatColors.muted,
+                      color: MarefatColors.mutedText(context),
                       fontWeight: FontWeight.w600,
                     ),
               ).animate().fadeIn(delay: 320.ms, duration: 500.ms),

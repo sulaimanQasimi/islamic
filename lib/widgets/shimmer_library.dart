@@ -8,8 +8,12 @@ class ShimmerLibrary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = MarefatColors.mistDeep;
-    final highlight = Colors.white.withValues(alpha: 0.85);
+    final dark = MarefatColors.isDark(context);
+    final base = dark ? MarefatColors.mistDeepDark : MarefatColors.mistDeep;
+    final highlight = dark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.85);
+    final boxColor = dark ? MarefatColors.mistDark : Colors.white;
 
     return Shimmer.fromColors(
       baseColor: base,
@@ -23,13 +27,13 @@ class ShimmerLibrary extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _box(height: 28, width: 140, radius: 10),
+                  _box(boxColor, height: 28, width: 140, radius: 10),
                   const SizedBox(height: 10),
-                  _box(height: 14, width: 220, radius: 8),
+                  _box(boxColor, height: 14, width: 220, radius: 8),
                   const SizedBox(height: 22),
-                  _box(height: 110, radius: 22),
+                  _box(boxColor, height: 110, radius: 22),
                   const SizedBox(height: 18),
-                  _box(height: 18, width: 100, radius: 8),
+                  _box(boxColor, height: 18, width: 100, radius: 8),
                 ],
               ),
             ),
@@ -44,7 +48,7 @@ class ShimmerLibrary extends StatelessWidget {
                 childAspectRatio: 0.68,
               ),
               delegate: SliverChildBuilderDelegate(
-                (_, __) => _box(radius: 18),
+                (_, __) => _box(boxColor, radius: 18),
                 childCount: 6,
               ),
             ),
@@ -54,12 +58,17 @@ class ShimmerLibrary extends StatelessWidget {
     );
   }
 
-  Widget _box({double? height, double? width, double radius = 14}) =>
+  Widget _box(
+    Color color, {
+    double? height,
+    double? width,
+    double radius = 14,
+  }) =>
       Container(
         height: height,
         width: width,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: color,
           borderRadius: BorderRadius.circular(radius),
         ),
       );

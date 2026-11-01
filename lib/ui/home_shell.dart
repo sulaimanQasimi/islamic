@@ -791,7 +791,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           const SizedBox(height: 8),
           Text(
             'اتصال را بررسی کنید یا دوباره تلاش کنید.',
-            style: TextStyle(color: MarefatColors.muted),
+            style: TextStyle(color: MarefatColors.mutedText(context)),
           ),
           const SizedBox(height: 18),
           FilledButton(onPressed: _loadCatalog, child: const Text('تلاش دوباره')),
@@ -1036,15 +1036,20 @@ class _BrandHeader extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [MarefatColors.ink, MarefatColors.forest],
+                colors: [
+                  MarefatColors.isDark(context)
+                      ? MarefatColors.nightSurface
+                      : MarefatColors.ink,
+                  MarefatColors.accent(context),
+                ],
               ),
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: MarefatColors.forest.withValues(alpha: 0.28),
+                  color: MarefatColors.accent(context).withValues(alpha: 0.28),
                   blurRadius: 16,
                   offset: const Offset(0, 8),
                 ),
@@ -1079,9 +1084,9 @@ class _BrandHeader extends StatelessWidget {
                     ),
                 const SizedBox(height: 2),
                 Text(
-                  'گنگنجینه دانش و شناخت· $bookCount کتاب',
+                  'گنجینه دانش و شناخت· $bookCount کتاب',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: MarefatColors.muted,
+                    color: MarefatColors.mutedText(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1121,19 +1126,20 @@ class _QuickToolsRow extends StatelessWidget {
           child: Ink(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: MarefatColors.mist.withValues(alpha: 0.75),
+              color: MarefatColors.softFill(context).withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: MarefatColors.mistDeep),
+              border: Border.all(color: MarefatColors.softBorder(context)),
             ),
             child: Column(
               children: [
-                Icon(icon, color: MarefatColors.forest, size: 20),
+                Icon(icon, color: MarefatColors.accent(context), size: 20),
                 const SizedBox(height: 4),
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
+                    color: MarefatColors.text(context),
                   ),
                 ),
               ],
@@ -1178,31 +1184,34 @@ class _QuickToolsRow extends StatelessWidget {
 
 class _OfflineBanner extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(
-      color: MarefatColors.forest.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: MarefatColors.forest.withValues(alpha: 0.2)),
-    ),
-    child: const Row(
-      children: [
-        Icon(Icons.cloud_off_rounded, size: 16, color: MarefatColors.forest),
-        SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'حالت آفلاین: فهرست ذخیره‌شده نمایش داده می‌شود.',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: MarefatColors.forest,
+  Widget build(BuildContext context) {
+    final accent = MarefatColors.accent(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 16, color: accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'حالت آفلاین: فهرست ذخیره‌شده نمایش داده می‌شود.',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _StatsRow extends StatelessWidget {
@@ -1264,32 +1273,34 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: (dark ? MarefatColors.nightSurface : Colors.white)
-            .withValues(alpha: dark ? 0.9 : 0.78),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: MarefatColors.mistDeep.withValues(alpha: dark ? 0.2 : 1),
+        color: MarefatColors.card(context).withValues(
+          alpha: MarefatColors.isDark(context) ? 0.9 : 0.78,
         ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: MarefatColors.softBorder(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: MarefatColors.brass),
+          Icon(icon, size: 18, color: MarefatColors.accentSoft(context)),
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: MarefatColors.text(context),
+            ),
           ),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: MarefatColors.muted,
+              color: MarefatColors.mutedText(context),
             ),
           ),
         ],
@@ -1529,9 +1540,9 @@ class _SectionToolbar extends StatelessWidget {
                 ),
                 Text(
                   detail,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: MarefatColors.forest,
+                    color: MarefatColors.accent(context),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1548,9 +1559,12 @@ class _SectionToolbar extends StatelessWidget {
               PopupMenuItem(value: LibrarySort.author, child: Text('نویسنده')),
               PopupMenuItem(value: LibrarySort.progress, child: Text('پیشرفت')),
             ],
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.sort_rounded, color: MarefatColors.ink),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                Icons.sort_rounded,
+                color: MarefatColors.text(context),
+              ),
             ),
           ),
           IconButton(
@@ -1558,7 +1572,7 @@ class _SectionToolbar extends StatelessWidget {
             onPressed: () => onGridView(!gridView),
             icon: Icon(
               gridView ? Icons.view_agenda_outlined : Icons.grid_view_rounded,
-              color: MarefatColors.ink,
+              color: MarefatColors.text(context),
             ),
           ),
         ],
@@ -1587,24 +1601,29 @@ class _CategoryBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, index) {
+        itemBuilder: (context, index) {
           final value = categories[index];
           final isSelected = value == selected;
+          final dark = MarefatColors.isDark(context);
           return ChoiceChip(
             label: Text(value),
             selected: isSelected,
             onSelected: (_) => onSelected(value),
-            selectedColor: MarefatColors.forest,
+            selectedColor: MarefatColors.accent(context),
             labelStyle: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: isSelected
                   ? Colors.white
-                  : MarefatColors.ink.withValues(alpha: 0.75),
+                  : MarefatColors.text(context).withValues(alpha: 0.8),
             ),
-            backgroundColor: Colors.white.withValues(alpha: 0.8),
+            backgroundColor: dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.8),
             side: BorderSide(
-              color: isSelected ? MarefatColors.forest : MarefatColors.mistDeep,
+              color: isSelected
+                  ? MarefatColors.accent(context)
+                  : MarefatColors.softBorder(context),
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
@@ -1652,9 +1671,7 @@ class _BookListTile extends StatelessWidget {
             color: (dark ? MarefatColors.nightSurface : Colors.white)
                 .withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: MarefatColors.mistDeep.withValues(alpha: dark ? 0.25 : 1),
-            ),
+            border: Border.all(color: MarefatColors.softBorder(context)),
           ),
           child: Row(
             children: [
@@ -1697,16 +1714,19 @@ class _BookListTile extends StatelessWidget {
                       book.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: MarefatColors.text(context),
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${book.author} · ${book.category}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: MarefatColors.muted,
+                        color: MarefatColors.mutedText(context),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1715,8 +1735,8 @@ class _BookListTile extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: progress > 0 ? ratio : 0,
                         minHeight: 4,
-                        backgroundColor: MarefatColors.mistDeep,
-                        color: MarefatColors.forest,
+                        backgroundColor: MarefatColors.softBorder(context),
+                        color: MarefatColors.accent(context),
                       ),
                     ),
                   ],
@@ -1730,7 +1750,7 @@ class _BookListTile extends StatelessWidget {
                       : Icons.favorite_border_rounded,
                   color: isFavorite
                       ? const Color(0xFFC45C4A)
-                      : MarefatColors.muted,
+                      : MarefatColors.mutedText(context),
                 ),
               ),
             ],
@@ -1785,9 +1805,9 @@ class _SearchTab extends StatelessWidget {
                 onChanged: (_) => onChanged(),
                 decoration: InputDecoration(
                   hintText: 'عنوان، نویسنده، موضوع یا توضیح…',
-                  prefixIcon: const Icon(
+                  prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: MarefatColors.forest,
+                    color: MarefatColors.accent(context),
                   ),
                   suffixIcon: controller.text.isEmpty
                       ? null
@@ -1810,7 +1830,7 @@ class _SearchTab extends StatelessWidget {
                     controller.text.isEmpty
                         ? 'عبارت جست‌وجو را وارد کنید.'
                         : 'نتیجه‌ای یافت نشد.',
-                    style: const TextStyle(color: MarefatColors.muted),
+                    style: TextStyle(color: MarefatColors.mutedText(context)),
                   ),
                 )
               : ListView.separated(
@@ -1879,10 +1899,10 @@ class _FavoritesTab extends StatelessWidget {
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'با لمس قلب روی جلد کتاب، آن را اینجا نگه دارید.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: MarefatColors.muted),
+                style: TextStyle(color: MarefatColors.mutedText(context)),
               ),
               const SizedBox(height: 18),
               FilledButton(
@@ -2029,7 +2049,9 @@ class _SettingsTab extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'ظاهر، هدف مطالعه و یادآورها',
-          style: theme.textTheme.bodyMedium?.copyWith(color: MarefatColors.muted),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: MarefatColors.mutedText(context),
+          ),
         ),
         const SizedBox(height: 22),
         _SettingsCard(
@@ -2121,7 +2143,10 @@ class _SettingsTab extends StatelessWidget {
             children: [
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.flag_rounded, color: MarefatColors.forest),
+                leading: Icon(
+                  Icons.flag_rounded,
+                  color: MarefatColors.accent(context),
+                ),
                 title: const Text(
                   'هدف روزانه',
                   style: TextStyle(fontWeight: FontWeight.w800),
@@ -2233,13 +2258,16 @@ class _SettingsTab extends StatelessWidget {
                 'معرفت',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w900,
-                  color: MarefatColors.forest,
+                  color: MarefatColors.accent(context),
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'نسخه ۱.۰ · کتاب‌خانهٔ خواندنی',
-                style: TextStyle(color: MarefatColors.muted, fontSize: 12),
+                style: TextStyle(
+                  color: MarefatColors.mutedText(context),
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -2255,17 +2283,12 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final bg = (dark ? MarefatColors.nightSurface : Colors.white)
-        .withValues(alpha: 0.88);
     return Material(
-      color: bg,
+      color: MarefatColors.card(context).withValues(alpha: 0.88),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: MarefatColors.mistDeep.withValues(alpha: dark ? 0.25 : 1),
-        ),
+        side: BorderSide(color: MarefatColors.softBorder(context)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -2292,9 +2315,9 @@ class _InfoRow extends StatelessWidget {
       ),
       Text(
         value,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w900,
-          color: MarefatColors.forest,
+          color: MarefatColors.accent(context),
         ),
       ),
     ],

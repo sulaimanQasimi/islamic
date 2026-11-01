@@ -22,6 +22,8 @@ class GoalProgressCard extends StatelessWidget {
     final progress =
         goalMinutes <= 0 ? 0.0 : (todayMinutes / goalMinutes).clamp(0.0, 1.0);
     final done = todayMinutes >= goalMinutes;
+    final accent = MarefatColors.accent(context);
+    final dark = MarefatColors.isDark(context);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
@@ -36,14 +38,18 @@ class GoalProgressCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
               gradient: LinearGradient(
                 colors: done
-                    ? const [Color(0xFF1A5C4E), Color(0xFF2E7D5B)]
+                    ? [
+                        accent,
+                        Color.lerp(accent, MarefatColors.brassSoft, 0.35)!,
+                      ]
                     : [
-                        MarefatColors.forest.withValues(alpha: 0.12),
-                        MarefatColors.brass.withValues(alpha: 0.1),
+                        accent.withValues(alpha: dark ? 0.22 : 0.12),
+                        MarefatColors.accentSoft(context)
+                            .withValues(alpha: dark ? 0.16 : 0.1),
                       ],
               ),
               border: Border.all(
-                color: MarefatColors.forest.withValues(alpha: done ? 0 : 0.18),
+                color: accent.withValues(alpha: done ? 0 : (dark ? 0.28 : 0.18)),
               ),
             ),
             child: Column(
@@ -55,7 +61,7 @@ class GoalProgressCard extends StatelessWidget {
                       done
                           ? Icons.emoji_events_rounded
                           : Icons.flag_rounded,
-                      color: done ? Colors.white : MarefatColors.forest,
+                      color: done ? Colors.white : accent,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -63,7 +69,9 @@ class GoalProgressCard extends StatelessWidget {
                         done ? 'هدف امروز کامل شد' : 'هدف مطالعهٔ روزانه',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
-                          color: done ? Colors.white : MarefatColors.ink,
+                          color: done
+                              ? Colors.white
+                              : MarefatColors.text(context),
                         ),
                       ),
                     ),
@@ -75,7 +83,7 @@ class GoalProgressCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: done
                             ? Colors.white.withValues(alpha: 0.18)
-                            : MarefatColors.mistDeep,
+                            : MarefatColors.softBorder(context),
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
@@ -83,7 +91,7 @@ class GoalProgressCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
-                          color: done ? Colors.white : MarefatColors.forest,
+                          color: done ? Colors.white : accent,
                         ),
                       ),
                     ),
@@ -97,8 +105,8 @@ class GoalProgressCard extends StatelessWidget {
                     minHeight: 8,
                     backgroundColor: done
                         ? Colors.white.withValues(alpha: 0.2)
-                        : MarefatColors.mistDeep,
-                    color: done ? const Color(0xFFD4B978) : MarefatColors.forest,
+                        : MarefatColors.softBorder(context),
+                    color: done ? const Color(0xFFD4B978) : accent,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -109,7 +117,7 @@ class GoalProgressCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: done
                         ? Colors.white.withValues(alpha: 0.85)
-                        : MarefatColors.muted,
+                        : MarefatColors.mutedText(context),
                   ),
                 ),
               ],

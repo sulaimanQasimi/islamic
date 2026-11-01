@@ -174,7 +174,7 @@ class ToolsHubPage extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        leading: Icon(icon, color: MarefatColors.forest),
+        leading: Icon(icon, color: MarefatColors.accent(context)),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_left_rounded),

@@ -134,13 +134,16 @@ class _CollectionsPageState extends State<CollectionsPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _collections.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(28),
+                      padding: const EdgeInsets.all(28),
                       child: Text(
                         'قفسه‌ای نیست.\nکتاب‌ها را در قفسه‌های موضوعی سازماندهی کنید.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(height: 1.7, color: MarefatColors.muted),
+                        style: TextStyle(
+                          height: 1.7,
+                          color: MarefatColors.mutedText(context),
+                        ),
                       ),
                     ),
                   )

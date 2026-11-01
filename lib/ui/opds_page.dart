@@ -88,9 +88,12 @@ class _OpdsPageState extends State<OpdsPage> {
                     label: const Text('بارگذاری فهرست'),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'لینک دریافت EPUB را می‌توانید کپی/اشتراک کنید و فایل را به assets/books بیفزایید.',
-                    style: TextStyle(fontSize: 12, color: MarefatColors.muted),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: MarefatColors.mutedText(context),
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -113,7 +116,8 @@ class _OpdsPageState extends State<OpdsPage> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    tileColor: MarefatColors.mist.withValues(alpha: 0.5),
+                    tileColor: MarefatColors.softFill(context)
+                        .withValues(alpha: 0.55),
                     title: Text(
                       e.title,
                       style: const TextStyle(fontWeight: FontWeight.w800),

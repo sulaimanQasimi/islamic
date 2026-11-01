@@ -92,6 +92,7 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
     final total = chapterCount <= 0 ? 1 : chapterCount;
     final ratio = ((progress + 1) / total).clamp(0.0, 1.0);
     final started = progress > 0;
+    final dark = MarefatColors.isDark(context);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -112,7 +113,7 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: MarefatColors.mistDeep,
+                    color: MarefatColors.hairline(context),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -146,7 +147,7 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                           Text(
                             book.author,
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: MarefatColors.forest,
+                              color: MarefatColors.accent(context),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -155,8 +156,14 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              _MetaChip(icon: Icons.category_outlined, label: book.category),
-                              _MetaChip(icon: Icons.translate_rounded, label: book.language),
+                              _MetaChip(
+                                icon: Icons.category_outlined,
+                                label: book.category,
+                              ),
+                              _MetaChip(
+                                icon: Icons.translate_rounded,
+                                label: book.language,
+                              ),
                               if (book.direction == 'ltr')
                                 const _MetaChip(
                                   icon: Icons.format_textdirection_l_to_r,
@@ -170,7 +177,7 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                                 ? 'پیشرفت مطالعه: فصل ${progress + 1} از $total'
                                 : 'هنوز شروع نشده',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: MarefatColors.muted,
+                              color: MarefatColors.mutedText(context),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -180,8 +187,8 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                             child: LinearProgressIndicator(
                               value: started ? ratio : 0,
                               minHeight: 6,
-                              backgroundColor: MarefatColors.mistDeep,
-                              color: MarefatColors.forest,
+                              backgroundColor: MarefatColors.softBorder(context),
+                              color: MarefatColors.accent(context),
                             ),
                           ),
                         ],
@@ -196,7 +203,7 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                     child: Text(
                       book.description,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: MarefatColors.muted,
+                        color: MarefatColors.mutedText(context),
                         height: 1.7,
                       ),
                     ),
@@ -209,7 +216,7 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                     child: Text(
                       'ترجمه: ${book.translator}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: MarefatColors.brass,
+                        color: MarefatColors.accentSoft(context),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -217,13 +224,14 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                 ],
                 if (widget.related.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  const Align(
+                  Align(
                     alignment: Alignment.centerRight,
                     child: Text(
                       'کتاب‌های مرتبط',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
+                        color: MarefatColors.text(context),
                       ),
                     ),
                   ),
@@ -246,9 +254,12 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                             width: 150,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: MarefatColors.mist.withValues(alpha: 0.85),
+                              color: MarefatColors.softFill(context)
+                                  .withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: MarefatColors.mistDeep),
+                              border: Border.all(
+                                color: MarefatColors.softBorder(context),
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,9 +268,10 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                                   related.title,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
+                                    color: MarefatColors.text(context),
                                   ),
                                 ),
                                 const Spacer(),
@@ -267,9 +279,9 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                                   related.category,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: MarefatColors.forest,
+                                    color: MarefatColors.accent(context),
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -359,11 +371,13 @@ class _BookDetailSheetState extends State<_BookDetailSheet> {
                       },
                       style: IconButton.styleFrom(
                         backgroundColor: _favorite
-                            ? const Color(0xFFFFE8E4)
-                            : MarefatColors.mistDeep,
+                            ? (dark
+                                ? const Color(0xFF4A2A26)
+                                : const Color(0xFFFFE8E4))
+                            : MarefatColors.softBorder(context),
                         foregroundColor: _favorite
                             ? const Color(0xFFC45C4A)
-                            : MarefatColors.ink,
+                            : MarefatColors.text(context),
                       ),
                       icon: Icon(
                         _favorite
@@ -389,26 +403,26 @@ class _MetaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: MarefatColors.mist.withValues(alpha: 0.9),
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: MarefatColors.mistDeep),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: MarefatColors.forest),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: MarefatColors.ink,
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: MarefatColors.softFill(context).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: MarefatColors.softBorder(context)),
         ),
-      ],
-    ),
-  );
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: MarefatColors.accent(context)),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: MarefatColors.text(context),
+              ),
+            ),
+          ],
+        ),
+      );
 }

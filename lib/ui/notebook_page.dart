@@ -176,13 +176,16 @@ class _NotebookPageState extends State<NotebookPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : visible.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(28),
+                      padding: const EdgeInsets.all(28),
                       child: Text(
                         'هنوز یادداشت یا برجسته‌سازی‌ای نیست.\nدر خواننده متن را برجسته کنید یا اینجا یادداشت بسازید.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(height: 1.7, color: MarefatColors.muted),
+                        style: TextStyle(
+                          height: 1.7,
+                          color: MarefatColors.mutedText(context),
+                        ),
                       ),
                     ),
                   )
@@ -225,7 +228,7 @@ class _NotebookPageState extends State<NotebookPage> {
                                           ? Icons.highlight_rounded
                                           : Icons.edit_note_rounded,
                                       size: 18,
-                                      color: MarefatColors.forest,
+                                      color: MarefatColors.accent(context),
                                     ),
                                     const SizedBox(width: 6),
                                     Expanded(
@@ -233,10 +236,10 @@ class _NotebookPageState extends State<NotebookPage> {
                                         '${item.bookTitle} · فصل ${item.chapter + 1}',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w800,
-                                          color: MarefatColors.forest,
+                                          color: MarefatColors.accent(context),
                                         ),
                                       ),
                                     ),
@@ -257,9 +260,9 @@ class _NotebookPageState extends State<NotebookPage> {
                                   const SizedBox(height: 8),
                                   Text(
                                     item.note!,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13,
-                                      color: MarefatColors.muted,
+                                      color: MarefatColors.mutedText(context),
                                       height: 1.5,
                                     ),
                                   ),

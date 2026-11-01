@@ -81,9 +81,9 @@ class _DictionaryPageState extends State<DictionaryPage> {
             ),
             const SizedBox(height: 8),
             if (entries.isEmpty)
-              const Text(
+              Text(
                 'هنوز واژه‌ای اضافه نکرده‌اید.',
-                style: TextStyle(color: MarefatColors.muted),
+                style: TextStyle(color: MarefatColors.mutedText(context)),
               )
             else
               ...entries.map(

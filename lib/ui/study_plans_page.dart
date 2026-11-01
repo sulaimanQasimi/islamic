@@ -117,11 +117,14 @@ class _StudyPlansPageState extends State<StudyPlansPage> {
           label: const Text('برنامهٔ جدید'),
         ),
         body: _plans.isEmpty
-            ? const Center(
+            ? Center(
                 child: Text(
                   'هنوز برنامه‌ای نیست.\nچند کتاب را در یک مسیر مطالعاتی بچینید.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(height: 1.7, color: MarefatColors.muted),
+                  style: TextStyle(
+                    height: 1.7,
+                    color: MarefatColors.mutedText(context),
+                  ),
                 ),
               )
             : ListView.separated(
@@ -144,7 +147,8 @@ class _StudyPlansPageState extends State<StudyPlansPage> {
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: LinearProgressIndicator(
                             value: plan.progress,
-                            color: MarefatColors.forest,
+                            color: MarefatColors.accent(context),
+                            backgroundColor: MarefatColors.softBorder(context),
                           ),
                         ),
                         for (final id in plan.bookIds)
@@ -160,7 +164,7 @@ class _StudyPlansPageState extends State<StudyPlansPage> {
                                   done
                                       ? Icons.check_circle
                                       : Icons.radio_button_unchecked,
-                                  color: MarefatColors.forest,
+                                  color: MarefatColors.accent(context),
                                 ),
                                 title: Text(book?.title ?? id),
                                 onTap: book == null

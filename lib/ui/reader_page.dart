@@ -361,7 +361,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     final noteController = TextEditingController();
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -388,7 +388,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                           width: 38,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.black12,
+                            color: MarefatColors.hairline(context),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -399,7 +399,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          color: MarefatColors.ink,
+                          color: MarefatColors.text(context),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -549,7 +549,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   Future<void> _showHighlights() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -575,7 +575,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                           width: 38,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.black12,
+                            color: MarefatColors.hairline(context),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -589,7 +589,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w900,
-                                    color: MarefatColors.ink,
+                                    color: MarefatColors.text(context),
                                   ),
                                 ),
                               ),
@@ -986,7 +986,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   Future<void> _showShareMenu() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1001,7 +1001,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                 width: 38,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.black12,
+                  color: MarefatColors.hairline(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -1127,7 +1127,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1174,7 +1174,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   Future<void> _startFocusMode() async {
     final minutes = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1191,9 +1191,9 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'نوار ابزار پنهان می‌شود تا زمان تمرکز تمام شود.',
-                style: TextStyle(color: MarefatColors.muted),
+                style: TextStyle(color: MarefatColors.mutedText(context)),
               ),
               const SizedBox(height: 16),
               for (final m in [10, 15, 25, 45])
@@ -1258,7 +1258,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   Future<void> _startSleepTimer() async {
     final minutes = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1362,7 +1362,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     }
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1485,7 +1485,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   Future<void> _openSettings() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -1504,18 +1504,18 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                     width: 38,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.black12,
+                      color: MarefatColors.hairline(context),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'تنظیمات مطالعه',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: MarefatColors.ink,
+                    color: MarefatColors.text(context),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -1606,8 +1606,8 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: selected
-                                ? MarefatColors.forest
-                                : Colors.black12,
+                                ? MarefatColors.accent(context)
+                                : MarefatColors.hairline(context),
                             width: selected ? 2.5 : 1,
                           ),
                           boxShadow: selected
@@ -1647,7 +1647,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     final chapters = _document?.chapters ?? [];
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: MarefatColors.surface,
+      backgroundColor: MarefatColors.sheet(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -1664,12 +1664,12 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
               controller: controller,
               padding: const EdgeInsets.all(20),
               children: [
-                const Text(
+                Text(
                   'فهرست کتاب',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: MarefatColors.ink,
+                    color: MarefatColors.text(context),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1679,15 +1679,15 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     selected: entry.key == _chapter,
-                    selectedTileColor: MarefatColors.forest.withValues(
-                      alpha: 0.1,
+                    selectedTileColor: MarefatColors.accent(context).withValues(
+                      alpha: 0.12,
                     ),
                     leading: CircleAvatar(
-                      backgroundColor: MarefatColors.mistDeep,
+                      backgroundColor: MarefatColors.softBorder(context),
                       child: Text(
                         '${entry.key + 1}',
-                        style: const TextStyle(
-                          color: MarefatColors.forest,
+                        style: TextStyle(
+                          color: MarefatColors.accent(context),
                           fontWeight: FontWeight.w800,
                           fontSize: 12,
                         ),
@@ -1695,12 +1695,15 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                     ),
                     title: Text(
                       entry.value.title,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: MarefatColors.text(context),
+                      ),
                     ),
                     trailing: _bookmarks.contains(entry.key)
-                        ? const Icon(
+                        ? Icon(
                             Icons.bookmark_rounded,
-                            color: MarefatColors.forest,
+                            color: MarefatColors.accent(context),
                           )
                         : null,
                     onTap: () {

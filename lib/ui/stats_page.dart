@@ -71,8 +71,9 @@ class _StatsPageState extends State<StatsPage> {
                               child: LinearProgressIndicator(
                                 value: (mins / max).clamp(0.0, 1.0),
                                 minHeight: 10,
-                                color: MarefatColors.forest,
-                                backgroundColor: MarefatColors.mistDeep,
+                                color: MarefatColors.accent(context),
+                                backgroundColor:
+                                    MarefatColors.softBorder(context),
                               ),
                             ),
                           ),
@@ -92,13 +93,13 @@ class _StatsPageState extends State<StatsPage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        leading: Icon(icon, color: MarefatColors.forest),
+        leading: Icon(icon, color: MarefatColors.accent(context)),
         title: Text(label),
         trailing: Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w900,
-            color: MarefatColors.forest,
+            color: MarefatColors.accent(context),
           ),
         ),
       ),

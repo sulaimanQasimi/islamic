@@ -98,10 +98,12 @@ class _HistoryPageState extends State<HistoryPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _items.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'هنوز تاریخچه‌ای ثبت نشده است.',
-                      style: TextStyle(color: MarefatColors.muted),
+                      style: TextStyle(
+                        color: MarefatColors.mutedText(context),
+                      ),
                     ),
                   )
                 : ListView.separated(
@@ -120,11 +122,11 @@ class _HistoryPageState extends State<HistoryPage> {
                             .surface
                             .withValues(alpha: 0.9),
                         leading: CircleAvatar(
-                          backgroundColor: MarefatColors.mistDeep,
+                          backgroundColor: MarefatColors.softBorder(context),
                           child: Text(
                             '${item.chapter + 1}',
-                            style: const TextStyle(
-                              color: MarefatColors.forest,
+                            style: TextStyle(
+                              color: MarefatColors.accent(context),
                               fontWeight: FontWeight.w800,
                               fontSize: 12,
                             ),

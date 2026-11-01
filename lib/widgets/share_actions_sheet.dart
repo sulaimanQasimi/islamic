@@ -12,7 +12,7 @@ Future<void> showShareActionsSheet({
 }) {
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: MarefatColors.surface,
+    backgroundColor: MarefatColors.sheet(context),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -29,7 +29,7 @@ Future<void> showShareActionsSheet({
                 width: 38,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.black12,
+                  color: MarefatColors.hairline(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -37,9 +37,10 @@ Future<void> showShareActionsSheet({
             const SizedBox(height: 14),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
+                color: MarefatColors.text(context),
               ),
             ),
             const SizedBox(height: 10),
@@ -47,15 +48,19 @@ Future<void> showShareActionsSheet({
               constraints: const BoxConstraints(maxHeight: 120),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: MarefatColors.mist.withValues(alpha: 0.7),
+                color: MarefatColors.softFill(context).withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: MarefatColors.softBorder(context)),
               ),
               child: SingleChildScrollView(
                 child: Text(
                   text.trim(),
                   maxLines: 6,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(height: 1.6),
+                  style: TextStyle(
+                    height: 1.6,
+                    color: MarefatColors.text(context),
+                  ),
                 ),
               ),
             ),
