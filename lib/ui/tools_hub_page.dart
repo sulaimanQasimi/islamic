@@ -44,12 +44,14 @@ class ToolsHubPage extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             _tile(
+              context,
               Icons.bar_chart_rounded,
               'آمار مطالعه',
               'دقایق، streak و کتاب‌های تمام‌شده',
               () => open(const StatsPage()),
             ),
             _tile(
+              context,
               Icons.manage_search_rounded,
               'جست‌وجوی سراسری',
               'جست‌وجو در متن همهٔ کتاب‌های کش‌شده',
@@ -62,6 +64,7 @@ class ToolsHubPage extends StatelessWidget {
               ),
             ),
             _tile(
+              context,
               Icons.sell_outlined,
               'جست‌وجوی برجسته‌ها',
               'فیلتر برچسب و متن برجسته‌شده‌ها',
@@ -73,6 +76,7 @@ class ToolsHubPage extends StatelessWidget {
               ),
             ),
             _tile(
+              context,
               Icons.checklist_rtl_rounded,
               'برنامه‌های مطالعه',
               'مسیر مطالعاتی با موعد',
@@ -81,18 +85,21 @@ class ToolsHubPage extends StatelessWidget {
               ),
             ),
             _tile(
+              context,
               Icons.menu_book_rounded,
               'واژه‌نامهٔ شخصی',
               'واژه‌های خودتان + واژه‌نامهٔ پیش‌فرض',
               () => open(const DictionaryPage()),
             ),
             _tile(
+              context,
               Icons.cloud_rounded,
               'فهرست OPDS',
               'اتصال به کاتالوگ راه دور',
               () => open(const OpdsPage()),
             ),
             _tile(
+              context,
               Icons.backup_rounded,
               'پشتیبان‌گیری',
               'خروجی ZIP از پیشرفت، برجسته‌ها و تنظیمات',
@@ -103,6 +110,7 @@ class ToolsHubPage extends StatelessWidget {
               },
             ),
             _tile(
+              context,
               Icons.restore_rounded,
               'بازیابی از JSON',
               'چسباندن محتوای marefat_backup.json',
@@ -166,6 +174,7 @@ class ToolsHubPage extends StatelessWidget {
   }
 
   Widget _tile(
+    BuildContext context,
     IconData icon,
     String title,
     String subtitle,

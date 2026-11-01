@@ -394,7 +394,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'برجسته‌سازی متن',
                         style: TextStyle(
                           fontSize: 18,
@@ -583,7 +583,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                           padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
                           child: Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Text(
                                   'برجسته‌شده‌ها',
                                   style: TextStyle(
