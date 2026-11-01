@@ -1079,7 +1079,7 @@ class _BrandHeader extends StatelessWidget {
                     ),
                 const SizedBox(height: 2),
                 Text(
-                  'گنجینهٔ دانش · $bookCount کتاب',
+                  'گنگنجینه دانش و شناخت· $bookCount کتاب',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: MarefatColors.muted,
                     fontWeight: FontWeight.w600,
