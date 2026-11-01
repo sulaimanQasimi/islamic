@@ -2152,7 +2152,7 @@ class _SettingsTab extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: Text('$goalMinutes دقیقه'),
-                trailing: const Icon(Icons.chevron_left_rounded),
+                trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: onEditGoal,
               ),
               const Divider(height: 8),

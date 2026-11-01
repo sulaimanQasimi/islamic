@@ -2282,7 +2282,7 @@ class _ReaderDock extends StatelessWidget {
               IconButton(
                 onPressed: onPrev,
                 tooltip: 'فصل قبل',
-                icon: Icon(Icons.chevron_left_rounded, color: foreground),
+                icon: Icon(Icons.chevron_right_rounded, color: foreground),
               ),
               Expanded(
                 child: Column(

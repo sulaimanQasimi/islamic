@@ -174,7 +174,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                           style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                         subtitle: Text('${c.bookIds.length} کتاب'),
-                        trailing: const Icon(Icons.chevron_left_rounded),
+                        trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _openCollection(c),
                         onLongPress: () async {
                           final del = await showDialog<bool>(

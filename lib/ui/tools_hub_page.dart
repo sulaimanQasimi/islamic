@@ -186,7 +186,7 @@ class ToolsHubPage extends StatelessWidget {
         leading: Icon(icon, color: MarefatColors.accent(context)),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_left_rounded),
+        trailing: const Icon(Icons.chevron_right_rounded),
         onTap: onTap,
       ),
     );
