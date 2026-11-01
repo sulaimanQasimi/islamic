@@ -1171,6 +1171,22 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     );
   }
 
+  void _cancelFocusMode({bool announce = true}) {
+    _focusTimer?.cancel();
+    if (!_focusActive && _focusRemainingSec == 0) return;
+    setState(() {
+      _focusActive = false;
+      _focusRemainingSec = 0;
+      _chromeVisible = true;
+    });
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (announce && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حالت تمرکز لغو شد.')),
+      );
+    }
+  }
+
   Future<void> _startFocusMode() async {
     final minutes = await showModalBottomSheet<int>(
       context: context,
@@ -1201,26 +1217,29 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                   title: Text('$m دقیقه'),
                   onTap: () => Navigator.pop(context, m),
                 ),
-              if (_focusActive)
-                TextButton(
+              if (_focusActive) ...[
+                const SizedBox(height: 4),
+                OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context, 0),
-                  child: const Text('پایان تمرکز'),
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('لغو تمرکز'),
                 ),
+              ],
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('بستن'),
+              ),
             ],
           ),
         ),
       ),
     );
     if (minutes == null) return;
-    _focusTimer?.cancel();
     if (minutes == 0) {
-      setState(() {
-        _focusActive = false;
-        _focusRemainingSec = 0;
-        _chromeVisible = true;
-      });
+      _cancelFocusMode();
       return;
     }
+    _focusTimer?.cancel();
     setState(() {
       _focusActive = true;
       _focusRemainingSec = minutes * 60;
@@ -1851,23 +1870,54 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                   : const SizedBox.shrink(),
                             ),
                             if (_focusActive || _sleepRemainingSec > 0)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 4,
-                                ),
+                              Material(
                                 color: MarefatColors.forest.withValues(
                                   alpha: 0.12,
                                 ),
-                                child: Text(
-                                  _sleepRemainingSec > 0
-                                      ? 'خواب · ${_formatFocus(_sleepRemainingSec)}'
-                                      : 'تمرکز · ${_formatFocus(_focusRemainingSec)}',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: _foreground,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _sleepRemainingSec > 0
+                                              ? 'خواب · ${_formatFocus(_sleepRemainingSec)}'
+                                              : 'تمرکز · ${_formatFocus(_focusRemainingSec)}',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: _foreground,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_focusActive)
+                                        TextButton(
+                                          onPressed: _cancelFocusMode,
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: _foreground,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                            ),
+                                            minimumSize: const Size(0, 32),
+                                            tapTargetSize:
+                                                MaterialTapTargetSize
+                                                    .shrinkWrap,
+                                          ),
+                                          child: const Text(
+                                            'لغو',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),
