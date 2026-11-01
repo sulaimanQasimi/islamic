@@ -14,7 +14,7 @@
         "gutenbergId": 0,
         "color": "#A38F6E",
         "icon": "menu_book",
-        "featured": false
+        "featured": true
       },
       {
         "id": "book_2",
@@ -30,7 +30,7 @@
         "gutenbergId": 0,
         "color": "#A38F6E",
         "icon": "menu_book",
-        "featured": false
+        "featured": true
       },
       {
         "id": "book_3",
@@ -46,7 +46,7 @@
         "gutenbergId": 0,
         "color": "#A38F6E",
         "icon": "menu_book",
-        "featured": false
+        "featured": true
       },
       {
         "id": "book_4",
