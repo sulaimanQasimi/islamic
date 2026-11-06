@@ -13,7 +13,6 @@ import '../services/dictionary_service.dart';
 import '../services/epub_parser.dart';
 import '../services/book_pdf_exporter.dart';
 import '../services/completed_books.dart';
-import '../services/cover_metadata.dart';
 import '../services/night_auto.dart';
 import '../services/reading_goals.dart';
 import '../services/reading_history.dart';
@@ -61,8 +60,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   double _autoScrollPx = 0; // 0 = off
   double _blueFilter = 0; // 0..0.5
   int _chapterSlide = 0; // -1 left, 1 right animation hint
-  String? _opfTitle;
-  String? _opfAuthor;
 
   static const _palettes = <(Color, Color, String)>[
     (Color(0xFFF7F4EC), Color(0xFF28352F), 'کاغذی'),
@@ -121,7 +118,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     final total = _document?.chapters.length ?? 1;
     final left = (total - _chapter - 1).clamp(0, total);
     if (left == 0) return 'پایان نزدیک است';
-    // ~3 minutes per chapter heuristic refined by session pace
     final secs = _pendingSeconds +
         (_sessionStarted == null
             ? 0
@@ -171,16 +167,12 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         fallbackTitle: widget.book.title,
         fallbackAuthor: widget.book.author,
       );
-      final meta = CoverMetadata.extract(epubBytes);
       await prefs.setInt('chapterCount_${widget.book.id}', doc.chapters.length);
       if (!cached) await BookCache.write(widget.book.id, epubBytes);
-      // Remember last book for quick resume.
       await prefs.setString('lastOpenedBookId', widget.book.id);
       if (!mounted) return;
       setState(() {
         _document = doc;
-        _opfTitle = meta.title;
-        _opfAuthor = meta.author;
         _isOffline = cached;
         _chapter = (prefs.getInt('progress_${widget.book.id}') ?? 0).clamp(
           0,
@@ -207,7 +199,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
           setState(() => _theme = NightAuto.readerNightThemeIndex);
         }
       }
-      // Persist migrated legacy highlights once.
       if (_highlights.isNotEmpty &&
           (prefs.getString('highlights_json_${widget.book.id}') == null ||
               prefs.getString('highlights_json_${widget.book.id}')!.isEmpty)) {
@@ -1959,125 +1950,111 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                                   BlendMode.srcATop,
                                 ),
                                 child: GestureDetector(
-                                behavior: HitTestBehavior.translucent,
-                                onTap: _toggleChrome,
-                                onDoubleTap: _toggleBookmark,
-                                onHorizontalDragEnd: (details) {
-                                  final v = details.primaryVelocity ?? 0;
-                                  final rtl = _contentDirection ==
-                                      TextDirection.rtl;
-                                  if (v.abs() < 200) return;
-                                  if (rtl) {
-                                    if (v > 0) {
-                                      _setChapter(_chapter + 1);
+                                  behavior: HitTestBehavior.translucent,
+                                  onTap: _toggleChrome,
+                                  onDoubleTap: _toggleBookmark,
+                                  onHorizontalDragEnd: (details) {
+                                    final v = details.primaryVelocity ?? 0;
+                                    final rtl = _contentDirection ==
+                                        TextDirection.rtl;
+                                    if (v.abs() < 200) return;
+                                    if (rtl) {
+                                      if (v > 0) {
+                                        _setChapter(_chapter + 1);
+                                      } else {
+                                        _setChapter(_chapter - 1);
+                                      }
                                     } else {
-                                      _setChapter(_chapter - 1);
+                                      if (v < 0) {
+                                        _setChapter(_chapter + 1);
+                                      } else {
+                                        _setChapter(_chapter - 1);
+                                      }
                                     }
-                                  } else {
-                                    if (v < 0) {
-                                      _setChapter(_chapter + 1);
-                                    } else {
-                                      _setChapter(_chapter - 1);
-                                    }
-                                  }
-                                },
-                                child: SelectionArea(
-                                  onSelectionChanged: (selection) {
-                                    final text = selection?.plainText ?? '';
-                                    if (text == _selectedText) return;
-                                    setState(() => _selectedText = text);
                                   },
-                                  child: Scrollbar(
-                                    controller: _scroll,
-                                    child: SingleChildScrollView(
+                                  child: SelectionArea(
+                                    onSelectionChanged: (selection) {
+                                      final text = selection?.plainText ?? '';
+                                      if (text == _selectedText) return;
+                                      setState(() => _selectedText = text);
+                                    },
+                                    child: Scrollbar(
                                       controller: _scroll,
-                                      padding: const EdgeInsets.fromLTRB(
-                                        28,
-                                        28,
-                                        28,
-                                        120,
-                                      ),
-                                      child: AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 320,
+                                      child: SingleChildScrollView(
+                                        controller: _scroll,
+                                        padding: const EdgeInsets.fromLTRB(
+                                          28,
+                                          28,
+                                          28,
+                                          120,
                                         ),
-                                        switchInCurve: Curves.easeOutCubic,
-                                        switchOutCurve: Curves.easeInCubic,
-                                        transitionBuilder: (child, anim) {
-                                          final offset = Tween<Offset>(
-                                            begin: Offset(
-                                              _chapterSlide >= 0 ? 0.08 : -0.08,
-                                              0,
-                                            ),
-                                            end: Offset.zero,
-                                          ).animate(anim);
-                                          return FadeTransition(
-                                            opacity: anim,
-                                            child: SlideTransition(
-                                              position: offset,
-                                              child: child,
-                                            ),
-                                          );
-                                        },
-                                        child: Directionality(
-                                          key: ValueKey('ch_$_chapter'),
-                                          textDirection: _contentDirection,
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.stretch,
-                                            children: [
-                                              Text(
-                                                current!.title,
-                                                textAlign:
-                                                    _contentDirection ==
-                                                            TextDirection.rtl
-                                                        ? TextAlign.right
-                                                        : TextAlign.left,
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  color: MarefatColors.forest,
-                                                  fontWeight: FontWeight.w800,
-                                                ),
+                                        child: AnimatedSwitcher(
+                                          duration: const Duration(
+                                            milliseconds: 320,
+                                          ),
+                                          switchInCurve: Curves.easeOutCubic,
+                                          switchOutCurve: Curves.easeInCubic,
+                                          transitionBuilder: (child, anim) {
+                                            final offset = Tween<Offset>(
+                                              begin: Offset(
+                                                _chapterSlide >= 0 ? 0.08 : -0.08,
+                                                0,
                                               ),
-                                              if (_opfTitle != null &&
-                                                  _opfTitle !=
-                                                      widget.book.title) ...[
-                                                const SizedBox(height: 6),
+                                              end: Offset.zero,
+                                            ).animate(anim);
+                                            return FadeTransition(
+                                              opacity: anim,
+                                              child: SlideTransition(
+                                                position: offset,
+                                                child: child,
+                                              ),
+                                            );
+                                          },
+                                          child: Directionality(
+                                            key: ValueKey('ch_$_chapter'),
+                                            textDirection: _contentDirection,
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
                                                 Text(
-                                                  'شناسهٔ جلد: $_opfTitle'
-                                                  '${_opfAuthor == null ? '' : ' · $_opfAuthor'}',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: _foreground
-                                                        .withValues(alpha: 0.5),
+                                                  current!.title,
+                                                  textAlign:
+                                                      _contentDirection ==
+                                                              TextDirection.rtl
+                                                          ? TextAlign.right
+                                                          : TextAlign.left,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: MarefatColors.forest,
+                                                    fontWeight: FontWeight.w800,
                                                   ),
                                                 ),
-                                              ],
-                                              const SizedBox(height: 22),
-                                              EpubHtmlView(
-                                                html: current.html.isNotEmpty
-                                                    ? current.html
-                                                    : '<p>${_escapeHtml(current.body)}</p>',
-                                                style: TextStyle(
-                                                  fontSize: _fontSize,
-                                                  height: _lineHeight,
-                                                  color: _foreground,
+                                                const SizedBox(height: 22),
+                                                EpubHtmlView(
+                                                  html: current.html.isNotEmpty
+                                                      ? current.html
+                                                      : '<p>${_escapeHtml(current.body)}</p>',
+                                                  style: TextStyle(
+                                                    fontSize: _fontSize,
+                                                    height: _lineHeight,
+                                                    color: _foreground,
+                                                  ),
+                                                  textAlign: _bodyAlign,
+                                                  textDirection:
+                                                      _contentDirection,
+                                                  highlights:
+                                                      _chapterHighlights,
+                                                  darkHighlights: _theme == 2,
                                                 ),
-                                                textAlign: _bodyAlign,
-                                                textDirection:
-                                                    _contentDirection,
-                                                highlights:
-                                                    _chapterHighlights,
-                                                darkHighlights: _theme == 2,
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
                               ),
                             ),
                           ],
