@@ -7,7 +7,7 @@ import 'package:printing/printing.dart';
 import '../models/book.dart';
 import 'epub_parser.dart';
 
-/// Builds a shareable PDF from an EPUB document.
+/// Builds a shareable PDF from an EPUB document without images.
 class BookPdfExporter {
   BookPdfExporter._();
 
@@ -17,14 +17,23 @@ class BookPdfExporter {
     int? maxChapters,
   }) async {
     final rtl = book.direction == 'rtl';
-    final baseFont = rtl
-        ? await PdfGoogleFonts.notoNaskhArabicRegular()
-        : await PdfGoogleFonts.notoSerifRegular();
-    final boldFont = rtl
-        ? await PdfGoogleFonts.notoNaskhArabicBold()
-        : await PdfGoogleFonts.notoSerifBold();
 
-    final theme = pw.ThemeData.withFont(base: baseFont, bold: boldFont);
+    // Load fonts and cross-script fallbacks to avoid missing glyph errors
+    final arabicRegular = await PdfGoogleFonts.notoNaskhArabicRegular();
+    final arabicBold = await PdfGoogleFonts.notoNaskhArabicBold();
+    final latinRegular = await PdfGoogleFonts.notoSerifRegular();
+    final latinBold = await PdfGoogleFonts.notoSerifBold();
+
+    final baseFont = rtl ? arabicRegular : latinRegular;
+    final boldFont = rtl ? arabicBold : latinBold;
+    final fallbackFont = rtl ? latinRegular : arabicRegular;
+
+    final theme = pw.ThemeData.withFont(
+      base: baseFont,
+      bold: boldFont,
+      fontFallback: [fallbackFont],
+    );
+
     final pdf = pw.Document(theme: theme);
     final chapters = maxChapters == null
         ? document.chapters
@@ -39,11 +48,10 @@ class BookPdfExporter {
           alignment: rtl ? pw.Alignment.centerRight : pw.Alignment.centerLeft,
           margin: const pw.EdgeInsets.only(bottom: 12),
           child: pw.Text(
-            'معرفت · ${book.title}',
-            style: pw.TextStyle(
+            rtl ? 'معرفت · ${book.title}' : 'Marefat · ${book.title}',
+            style: const pw.TextStyle(
               fontSize: 9,
               color: PdfColors.grey600,
-              font: baseFont,
             ),
           ),
         ),
@@ -52,10 +60,9 @@ class BookPdfExporter {
           margin: const pw.EdgeInsets.only(top: 12),
           child: pw.Text(
             '${context.pageNumber} / ${context.pagesCount}',
-            style: pw.TextStyle(
+            style: const pw.TextStyle(
               fontSize: 9,
               color: PdfColors.grey600,
-              font: baseFont,
             ),
           ),
         ),
@@ -65,27 +72,24 @@ class BookPdfExporter {
             style: pw.TextStyle(
               fontSize: 22,
               fontWeight: pw.FontWeight.bold,
-              font: boldFont,
             ),
           ),
           pw.SizedBox(height: 8),
           pw.Text(
             book.author,
-            style: pw.TextStyle(
+            style: const pw.TextStyle(
               fontSize: 13,
               color: PdfColors.teal800,
-              font: baseFont,
             ),
           ),
           if (book.description.isNotEmpty) ...[
             pw.SizedBox(height: 14),
             pw.Text(
               book.description,
-              style: pw.TextStyle(
+              style: const pw.TextStyle(
                 fontSize: 11,
                 lineSpacing: 4,
                 color: PdfColors.grey700,
-                font: baseFont,
               ),
             ),
           ],
@@ -96,27 +100,18 @@ class BookPdfExporter {
             pw.Header(
               level: 1,
               child: pw.Text(
-                chapters[i].title.isEmpty
-                    ? 'فصل ${i + 1}'
+                chapters[i].title.trim().isEmpty
+                    ? (rtl ? 'فصل ${i + 1}' : 'Chapter ${i + 1}')
                     : chapters[i].title,
                 style: pw.TextStyle(
                   fontSize: 15,
                   fontWeight: pw.FontWeight.bold,
-                  font: boldFont,
                 ),
               ),
             ),
             pw.SizedBox(height: 8),
-            pw.Paragraph(
-              text: chapters[i].body.trim().isEmpty
-                  ? '—'
-                  : chapters[i].body.trim(),
-              style: pw.TextStyle(
-                fontSize: 11.5,
-                lineSpacing: 5,
-                font: baseFont,
-              ),
-            ),
+            // Strips HTML/image tags and splits text to prevent layout overflow
+            ..._buildTextParagraphs(chapters[i].body),
             pw.SizedBox(height: 16),
           ],
         ],
@@ -124,6 +119,51 @@ class BookPdfExporter {
     );
 
     return pdf.save();
+  }
+
+  /// Removes any inline images, HTML tags, or Markdown image references,
+  /// then splits the clean content into individual pw.Paragraph elements.
+  static List<pw.Widget> _buildTextParagraphs(String body) {
+    if (body.trim().isEmpty) {
+      return [pw.Paragraph(text: '—')];
+    }
+
+    // Strip HTML <img> tags
+    var sanitized = body.replaceAll(
+      RegExp(r'<img[^>]*>', caseSensitive: false),
+      '',
+    );
+
+    // Strip Markdown images: ![alt](url)
+    sanitized = sanitized.replaceAll(
+      RegExp(r'!\[.*?\]\(.*?\)', caseSensitive: false),
+      '',
+    );
+
+    // Strip remaining common HTML formatting tags from EPUB body text
+    sanitized = sanitized.replaceAll(RegExp(r'</?(p|div|span|br|b|i|em|strong)[^>]*>', caseSensitive: false), '\n');
+
+    final paragraphs = sanitized
+        .split(RegExp(r'\r?\n+'))
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+
+    if (paragraphs.isEmpty) {
+      return [pw.Paragraph(text: '—')];
+    }
+
+    return paragraphs
+        .map(
+          (text) => pw.Paragraph(
+            text: text,
+            style: const pw.TextStyle(
+              fontSize: 11.5,
+              lineSpacing: 5,
+            ),
+          ),
+        )
+        .toList();
   }
 
   static String fileNameFor(Book book) {
