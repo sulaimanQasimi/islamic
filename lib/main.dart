@@ -5,12 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'services/app_storage.dart';
+import 'services/daily_notification_service.dart';
 import 'services/night_auto.dart';
+import 'services/study_reminder.dart';
 import 'theme/marefat_theme.dart';
 import 'ui/home_shell.dart';
 import 'ui/splash_page.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -18,6 +20,12 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+  try {
+    await DailyNotificationService.init();
+    await StudyReminder.syncSchedule();
+  } catch (_) {
+    // Notifications are best-effort on first launch / unsupported platforms.
+  }
   runApp(const MarefatApp());
 }
 

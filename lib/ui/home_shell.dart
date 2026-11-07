@@ -118,23 +118,40 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   Future<void> _maybeShowReminder() async {
+    await StudyReminder.syncSchedule();
     if (!await StudyReminder.shouldNudge()) return;
     if (!mounted) return;
     await StudyReminder.markShown();
     if (!mounted) return;
+    final today = StudyReminder.todayReflection();
     await showDialog<void>(
       context: context,
       builder: (context) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: const Text('یادآور مطالعه'),
-          content: const Text(
-            'وقت مطالعه رسیده است. چند دقیقه با معرفت همراه باشید.',
+          title: Text(today.title),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(today.body, style: const TextStyle(height: 1.7)),
+                const SizedBox(height: 12),
+                Text(
+                  '— ${today.source}',
+                  style: TextStyle(
+                    color: MarefatColors.mutedText(context),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('بعداً'),
+              child: const Text('بستن'),
             ),
             FilledButton(
               onPressed: () {
@@ -2048,7 +2065,7 @@ class _SettingsTab extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'ظاهر، هدف مطالعه و یادآورها',
+          'ظاهر، هدف مطالعه و اعلان‌های روزانه',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: MarefatColors.mutedText(context),
           ),
@@ -2159,17 +2176,19 @@ class _SettingsTab extends StatelessWidget {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text(
-                  'یادآور مطالعه',
+                  'اعلان روزانه معرفت',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
-                subtitle: Text('ساعت ${_hh(reminderHour, reminderMinute)}'),
+                subtitle: Text(
+                  'هر روز ساعت ${_hh(reminderHour, reminderMinute)} از جام و میگر',
+                ),
                 value: reminderOn,
                 onChanged: onReminder,
               ),
               if (reminderOn)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('زمان یادآور'),
+                  title: const Text('زمان اعلان روزانه'),
                   trailing: Text(_hh(reminderHour, reminderMinute)),
                   onTap: () async {
                     final picked = await showTimePicker(

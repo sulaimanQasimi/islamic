@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.13.4
+  sdk: ">=3.5.0 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -38,11 +38,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   archive: ^3.6.1
   collection: ^1.19.1
-  shared_preferences: ^2.5.3
+  shared_preferences: ">=2.3.0 <3.0.0"
   web: ^1.1.1
   xml: ^6.5.0
-  path_provider: ^2.1.6
-  google_fonts: ^6.3.2
+  path_provider: ">=2.1.0 <3.0.0"
+  google_fonts: ^6.2.1
   flutter_animate: ^4.5.2
   shimmer: ^3.0.0
   # Keep on 10.x — Share.share API. (11+ uses SharePlus/ShareParams.)
@@ -50,6 +50,9 @@ dependencies:
   pdf: ^3.11.3
   printing: ^5.14.2
   http: ^1.2.2
+  flutter_local_notifications: ^18.0.1
+  flutter_timezone: ^4.1.0
+  timezone: ^0.9.4
 
 dev_dependencies:
   flutter_test:
